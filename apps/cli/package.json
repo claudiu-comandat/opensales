@@ -17,11 +17,11 @@
   "dependencies": {
     "@opensales/db": "workspace:*",
     "@opensales/plugin-sdk": "workspace:*",
-    "commander": "^12.1.0",
+    "commander": "^15.0.0",
     "kleur": "^4.1.5",
-    "ora": "^8.1.0",
+    "ora": "^9.4.1",
     "simple-git": "^3.27.0",
-    "tar": "^7.4.3"
+    "tar": "^7.5.19"
   },
   "devDependencies": {
     "@types/tar": "^7.0.87",

@@ -1,0 +1,20 @@
+# Railway service configuration.
+# See https://docs.railway.com/reference/config-as-code
+#
+# This config applies to the API service. Deploy the web service separately
+# from `apps/web/Dockerfile` and set NEXT_PUBLIC_API_URL to point at the
+# api service's public URL. See README.md "Deploy to Railway".
+
+[deploy]
+# Force Railway to use our entrypoint script (bypasses any "Custom Start
+# Command" cached in the dashboard from earlier deploys). The entrypoint
+# auto-generates secrets, runs migrations, and starts the API via SWC.
+startCommand = "/usr/local/bin/entrypoint.sh"
+healthcheckPath = "/healthz"
+# 90s tolerates cold-start: image pull, container boot, NestJS bootstrap,
+# drizzle migrations on first deploy. After warmup steady-state /healthz is
+# under 50ms.
+healthcheckTimeout = 90
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+numReplicas = 1

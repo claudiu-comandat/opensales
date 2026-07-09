@@ -1,0 +1,651 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   OpenSales — Foundation
+   Premium business tool · subtle glass · IBM Plex
+   Ported 1:1 from design spec foundation.css
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --bg: #f6f7f9;
+    --bg-subtle: #eef0f3;
+    --app-bg:
+      radial-gradient(1200px 600px at 10% 0%, rgba(59, 91, 255, 0.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 100%, rgba(47, 71, 224, 0.05), transparent 60%),
+      #f6f7f9;
+    --surface: #ffffff;
+    --surface-elev: #ffffffeb;
+    --surface-glass: rgba(255, 255, 255, 0.72);
+    --surface-ink: #0b0d12;
+    --surface-ink-glass: rgba(14, 17, 24, 0.78);
+
+    /* Text */
+    --ink-900: #0b0d12;
+    --ink-800: #1a1d24;
+    --ink-700: #2b2f39;
+    --ink-600: #4a4f5c;
+    --ink-500: #6b7280;
+    --ink-400: #97a0ad;
+    --ink-300: #c3cad3;
+    --ink-200: #e3e6eb;
+    --ink-100: #eef0f3;
+    --ink-50: #f6f7f9;
+
+    /* Primary — albastru rafinat, business */
+    --brand-50: #eef2ff;
+    --brand-100: #dce4ff;
+    --brand-200: #b8c7ff;
+    --brand-300: #8ea6ff;
+    --brand-400: #5e7dff;
+    --brand-500: #3b5bff;
+    --brand-600: #2f47e0;
+    --brand-700: #2538b8;
+    --brand-800: #1d2c90;
+    --brand-900: #16226e;
+
+    /* Semantic */
+    --success: #16a06b;
+    --success-bg: #e6f5ec;
+    --warning: #b87a1f;
+    --warning-bg: #fbf1df;
+    --danger: #c5362e;
+    --danger-bg: #fbe7e5;
+    --info: #2f47e0;
+    --info-bg: #e8ecff;
+
+    /* Radii */
+    --r-xs: 6px;
+    --r-sm: 8px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 18px;
+    --r-2xl: 24px;
+    --r-full: 999px;
+
+    /* Shadows */
+    --shadow-xs: 0 1px 1px rgba(11, 13, 18, 0.04);
+    --shadow-sm: 0 1px 2px rgba(11, 13, 18, 0.06), 0 1px 1px rgba(11, 13, 18, 0.04);
+    --shadow-md: 0 4px 12px -4px rgba(11, 13, 18, 0.08), 0 2px 4px rgba(11, 13, 18, 0.04);
+    --shadow-lg: 0 12px 32px -12px rgba(11, 13, 18, 0.14), 0 4px 10px rgba(11, 13, 18, 0.05);
+    --shadow-glass: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 20px 48px -24px rgba(11, 13, 18, 0.2);
+
+    /* Type */
+    --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Density */
+    --row-h: 52px;
+    --gap: 16px;
+    --pad: 20px;
+
+    /* shadcn primitive bridge — mapped onto OpenSales palette */
+    --background: 0 0% 96.5%;
+    --foreground: 222 32% 6%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 32% 6%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 32% 6%;
+    --primary: 230 75% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 95%;
+    --secondary-foreground: 222 32% 6%;
+    --muted: 220 14% 95%;
+    --muted-foreground: 220 9% 36%;
+    --accent: 220 14% 95%;
+    --accent-foreground: 222 32% 6%;
+    --destructive: 4 60% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 230 75% 60%;
+    --radius: 0.625rem;
+  }
+
+  /* ============================================================
+     Dark mode — invert ink scale + darken surfaces, brand stays vivid.
+     Activated via next-themes adding `class="dark"` on <html>.
+     ============================================================ */
+  .dark {
+    /* Surfaces */
+    --bg: #0a0c10;
+    --bg-subtle: #11141a;
+    --app-bg:
+      radial-gradient(1200px 600px at 10% 0%, rgba(94, 125, 255, 0.12), transparent 60%),
+      radial-gradient(900px 500px at 100% 100%, rgba(47, 71, 224, 0.08), transparent 60%),
+      #0a0c10;
+    --surface: #14171f;
+    --surface-elev: rgba(26, 29, 38, 0.92);
+    --surface-glass: rgba(20, 23, 31, 0.72);
+    --surface-ink: #f6f7f9;
+    --surface-ink-glass: rgba(246, 247, 249, 0.78);
+
+    /* Text — inverted ink scale */
+    --ink-900: #f6f7f9;
+    --ink-800: #eef0f3;
+    --ink-700: #c3cad3;
+    --ink-600: #97a0ad;
+    --ink-500: #6b7280;
+    --ink-400: #4a4f5c;
+    --ink-300: #2b2f39;
+    --ink-200: #1f232c;
+    --ink-100: #161922;
+    --ink-50: #11141a;
+
+    /* Brand — slightly brighter for contrast on dark surfaces */
+    --brand-50: #16226e;
+    --brand-100: #1d2c90;
+    --brand-200: #2538b8;
+    --brand-300: #2f47e0;
+    --brand-400: #3b5bff;
+    --brand-500: #5e7dff;
+    --brand-600: #8ea6ff;
+    --brand-700: #b8c7ff;
+    --brand-800: #dce4ff;
+    --brand-900: #eef2ff;
+
+    /* Semantic — keep hue, darken bg */
+    --success: #2ec07e;
+    --success-bg: #0e2419;
+    --warning: #d49a3f;
+    --warning-bg: #2a1f0e;
+    --danger: #e25950;
+    --danger-bg: #2a1311;
+    --info: #5e7dff;
+    --info-bg: #131a3a;
+
+    /* Shadows — stronger for visibility on dark */
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px -4px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 32px -12px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
+    --shadow-glass: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 48px -24px rgba(0, 0, 0, 0.6);
+
+    /* shadcn primitive bridge — dark equivalents */
+    --background: 222 32% 6%;
+    --foreground: 0 0% 96.5%;
+    --card: 222 32% 9%;
+    --card-foreground: 0 0% 96.5%;
+    --popover: 222 32% 9%;
+    --popover-foreground: 0 0% 96.5%;
+    --primary: 230 75% 65%;
+    --primary-foreground: 222 32% 6%;
+    --secondary: 222 14% 14%;
+    --secondary-foreground: 0 0% 96.5%;
+    --muted: 222 14% 14%;
+    --muted-foreground: 220 9% 65%;
+    --accent: 222 14% 14%;
+    --accent-foreground: 0 0% 96.5%;
+    --destructive: 4 60% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 14% 18%;
+    --input: 222 14% 18%;
+    --ring: 230 75% 65%;
+  }
+
+  /* Density modifiers */
+  .density-compact {
+    --row-h: 42px;
+    --gap: 12px;
+    --pad: 14px;
+  }
+  .density-comfortable {
+    --row-h: 52px;
+    --gap: 16px;
+    --pad: 20px;
+  }
+  .density-spacious {
+    --row-h: 64px;
+    --gap: 22px;
+    --pad: 28px;
+  }
+}
+
+@layer base {
+  html {
+    /* Scale UI to 75% — matches the design's intended density on a 1080p+ screen.
+       The admin layout uses calc(100vh / 0.75) to compensate so the page fills the screen. */
+    zoom: 0.75;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background: var(--app-bg, var(--bg));
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings:
+      'ss01',
+      'ss02',
+      'cv11';
+    letter-spacing: -0.005em;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  * {
+    @apply border-border;
+  }
+}
+
+/* ---------- Typography ---------- */
+@layer components {
+  .t-display {
+    font-size: 32px;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    color: var(--ink-900);
+  }
+  .t-h1 {
+    font-size: 24px;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    color: var(--ink-900);
+  }
+  .t-h2 {
+    font-size: 18px;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+    color: var(--ink-900);
+  }
+  .t-h3 {
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 600;
+    color: var(--ink-900);
+  }
+  .t-body {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-700);
+  }
+  .t-small {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-600);
+  }
+  .t-xs {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--ink-500);
+  }
+  .t-micro {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--ink-500);
+    letter-spacing: 0.02em;
+  }
+  .t-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+  }
+  .t-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .t-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* ---------- Surfaces ---------- */
+  .card-os {
+    background: var(--surface);
+    border: 1px solid var(--ink-200);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+  }
+  .card-elev {
+    background: var(--surface);
+    border: 1px solid var(--ink-200);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-md);
+  }
+  .glass {
+    background: var(--surface-glass);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: var(--shadow-glass);
+  }
+  .glass-dark {
+    background: var(--surface-ink-glass);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: #e8eaf0;
+  }
+
+  /* ---------- Buttons (raw OpenSales class API) ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--brand-600);
+    color: #fff;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.2) inset,
+      0 1px 2px rgba(47, 71, 224, 0.3);
+  }
+  .btn-primary:hover {
+    background: var(--brand-700);
+  }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--ink-800);
+    border-color: var(--ink-200);
+    box-shadow: var(--shadow-xs);
+  }
+  .btn-secondary:hover {
+    background: var(--ink-50);
+    border-color: var(--ink-300);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-700);
+  }
+  .btn-ghost:hover {
+    background: var(--ink-100);
+  }
+  .btn-dark {
+    background: var(--ink-900);
+    color: #fff;
+  }
+  .btn-dark:hover {
+    background: var(--ink-800);
+  }
+  .btn-sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    border-radius: 8px;
+  }
+  .btn-lg {
+    height: 44px;
+    padding: 0 18px;
+    font-size: 14px;
+    border-radius: 12px;
+  }
+  .btn-icon {
+    width: 34px;
+    padding: 0;
+    height: 34px;
+  }
+
+  /* ---------- Inputs ---------- */
+  .input-os {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    background: var(--surface);
+    border: 1px solid var(--ink-200);
+    border-radius: var(--r-md);
+    font-size: 13.5px;
+    color: var(--ink-900);
+    font-family: inherit;
+    transition: all 0.15s ease;
+  }
+  .input-os:focus {
+    outline: none;
+    border-color: var(--brand-500);
+    box-shadow: 0 0 0 3px rgba(59, 91, 255, 0.12);
+  }
+  .input-os::placeholder {
+    color: var(--ink-400);
+  }
+
+  /* ---------- Chips / Badges ---------- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--r-full);
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+    background: var(--ink-100);
+    color: var(--ink-700);
+    border: 1px solid transparent;
+  }
+  .chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .chip-brand {
+    background: var(--brand-50);
+    color: var(--brand-700);
+  }
+  .chip-success {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+  .chip-warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+  .chip-danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+  .chip-neutral {
+    background: var(--ink-100);
+    color: var(--ink-700);
+  }
+  .chip-outline {
+    background: transparent;
+    border-color: var(--ink-200);
+    color: var(--ink-700);
+  }
+
+  /* ---------- Divider ---------- */
+  .divider {
+    height: 1px;
+    background: var(--ink-200);
+    border: none;
+  }
+  .divider-soft {
+    height: 1px;
+    background: var(--ink-100);
+    border: none;
+  }
+
+  /* ---------- Brand logo mark ---------- */
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--brand-500) 0%, var(--brand-700) 100%);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.2) inset,
+      0 2px 6px rgba(47, 71, 224, 0.35);
+    flex-shrink: 0;
+  }
+  .brand-mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(120% 80% at 20% 10%, rgba(255, 255, 255, 0.35), transparent 60%);
+    pointer-events: none;
+  }
+
+  /* ---------- Table ---------- */
+  .tbl {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13.5px;
+  }
+  .tbl th {
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 500;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    background: var(--ink-50);
+    border-bottom: 1px solid var(--ink-200);
+    white-space: nowrap;
+  }
+  .tbl td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ink-100);
+    color: var(--ink-800);
+    vertical-align: middle;
+  }
+  .tbl tr:last-child td {
+    border-bottom: none;
+  }
+  .tbl tr:hover td {
+    background: var(--ink-50);
+  }
+  .tbl .col-right {
+    text-align: right;
+  }
+  .tbl .col-num {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  /* ---------- Placeholder art ---------- */
+  .ph-img {
+    background: repeating-linear-gradient(135deg, var(--ink-100) 0 8px, var(--ink-50) 8px 16px);
+    border: 1px solid var(--ink-200);
+    border-radius: var(--r-md);
+    color: var(--ink-400);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---------- Marketplace brand chips ---------- */
+  .mp-emag {
+    color: #c5362e;
+    background: #fbe7e5;
+  }
+  .mp-trendyol {
+    color: #d17a1e;
+    background: #fbf1df;
+  }
+  .mp-altex {
+    color: #c5362e;
+    background: #fbe7e5;
+  }
+  .mp-fashion {
+    color: #6d28d9;
+    background: #ede9fe;
+  }
+  .mp-olx {
+    color: #16a06b;
+    background: #e6f5ec;
+  }
+  .mp-shopify {
+    color: #16a06b;
+    background: #e6f5ec;
+  }
+  .mp-manual {
+    color: #4a4f5c;
+    background: #eef0f3;
+  }
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ink-200);
+  border: 2px solid var(--bg);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-300);
+}
+
+/* ---------- Animations ---------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-in {
+  animation: fadeInUp 0.4s ease both;
+}
+
+@keyframes pulse-os {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-os 1.6s ease-in-out infinite;
+}

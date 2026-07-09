@@ -1,0 +1,51 @@
+{
+  "name": "opensales-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.12.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit && pnpm -r --parallel typecheck",
+    "test": "vitest run --workspace vitest.workspace.ts --passWithNoTests",
+    "test:watch": "vitest --workspace vitest.workspace.ts",
+    "test:ui": "vitest --ui --workspace vitest.workspace.ts",
+    "test:coverage": "vitest run --coverage --workspace vitest.workspace.ts --passWithNoTests",
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "prepare": "husky",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:reset": "docker compose down -v && docker compose up -d postgres",
+    "db:test:up": "docker compose --profile test up -d postgres-test",
+    "db:test:down": "docker compose --profile test down"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@eslint/js": "^9.13.0",
+    "@types/node": "^22.7.0",
+    "@vitest/coverage-v8": "^2.1.4",
+    "@vitest/ui": "^2.1.4",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import-x": "^4.3.1",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "globals": "^15.11.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.10.0",
+    "vitest": "^2.1.4"
+  }
+}

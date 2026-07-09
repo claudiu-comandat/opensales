@@ -1,0 +1,155 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/trendyol",
+  "version": "0.1.0",
+  "displayName": "Trendyol",
+  "description": "Conector pentru Trendyol International Marketplace API (CEE/Gulf/DACH). Sincronizează produse, comenzi, stocuri, prețuri și webhook-uri.",
+  "type": "marketplace",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["marketplace", "shipping"],
+  "permissions": [
+    "products:read",
+    "products:write",
+    "listings:read",
+    "listings:write",
+    "orders:read",
+    "orders:write",
+    "orders:status:write",
+    "stock:read",
+    "stock:write",
+    "events:emit",
+    "http:outbound"
+  ],
+  "events": ["order.status_changed", "stock.changed", "listing.updated"],
+  "actions": {
+    "createProduct": {
+      "description": "Creează produse noi pe Trendyol V2 (async, returnează batchRequestId).",
+      "input": {},
+      "output": {}
+    },
+    "updateApprovedContent": {
+      "description": "Actualizează conținutul (title/description/images/attributes) produselor APROBATE pe Trendyol V2 (content-bulk-update, async, returnează batchRequestId).",
+      "input": {},
+      "output": {}
+    },
+    "updateUnapprovedProduct": {
+      "description": "Actualizează produse neaprobate (pendingApproval/unapproved) pe Trendyol V2 (async, returnează batchRequestId).",
+      "input": {},
+      "output": {}
+    },
+    "filterProducts": {
+      "description": "Filtrează și listează produsele din Trendyol V2.",
+      "input": {},
+      "output": {}
+    },
+    "updateStockAndPrice": {
+      "description": "Actualizează stoc și prețuri pentru SKU-uri (fără rate limit).",
+      "input": {},
+      "output": {}
+    },
+    "checkBatchRequest": {
+      "description": "Verifică statusul unui batch request asincron (IN_PROGRESS sau COMPLETED).",
+      "input": {},
+      "output": {}
+    },
+    "archiveProducts": {
+      "description": "Arhivează (pasiv) sau dezarhivează (activ) produse — batch (archive-state).",
+      "input": {},
+      "output": {}
+    },
+    "getCategoryList": {
+      "description": "Returnează lista completă de categorii Trendyol.",
+      "input": {},
+      "output": {}
+    },
+    "getBrandList": {
+      "description": "Returnează lista de branduri Trendyol (opțional filtrată după nume).",
+      "input": {},
+      "output": {}
+    },
+    "getCategoryAttributes": {
+      "description": "Returnează atributele unei categorii (V2) necesare la crearea produselor.",
+      "input": {},
+      "output": {}
+    },
+    "getOrders": {
+      "description": "Pull comenzile (shipment packages) din Trendyol.",
+      "input": {},
+      "output": {}
+    },
+    "updatePackageStatus": {
+      "description": "Actualizează statusul unui pachet (PICKING, INVOICED, etc.).",
+      "input": {},
+      "output": {}
+    },
+    "updateTrackingNumber": {
+      "description": "Setează numărul de tracking și codul curierului pentru un pachet.",
+      "input": {},
+      "output": {}
+    },
+    "cancelPackage": {
+      "description": "Anulează un pachet (total sau parțial — UNSUPPLIED).",
+      "input": {},
+      "output": {}
+    },
+    "getAwbLabel": {
+      "description": "Descarcă PDF-ul AWB (common label) după cargoTrackingNumber. Returnează base64.",
+      "input": {},
+      "output": {}
+    },
+    "createWebhook": {
+      "description": "Creează un abonament webhook pentru notificări de comenzi.",
+      "input": {},
+      "output": {}
+    },
+    "listWebhooks": {
+      "description": "Listează abonamentele webhook existente.",
+      "input": {},
+      "output": {}
+    },
+    "deleteWebhook": {
+      "description": "Șterge un abonament webhook.",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "sellerId",
+        "label": "Seller ID",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "apiKey",
+        "label": "API Key",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "apiSecretKey",
+        "label": "API Secret Key",
+        "type": "password",
+        "required": true
+      },
+      {
+        "name": "userAgent",
+        "label": "User Agent (ex: \"123456 - OpenSales\")",
+        "type": "string",
+        "required": true
+      }
+    ]
+  },
+  "configSchema": {
+    "fields": [
+      {
+        "name": "invoiceSeries",
+        "label": "Serie facturi (ex. TR) — folosită de FGO la emitere pe comenzile acestui marketplace",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

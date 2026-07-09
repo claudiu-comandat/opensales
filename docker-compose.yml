@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: opensales-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opensales
+      POSTGRES_PASSWORD: opensales
+      POSTGRES_DB: opensales
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U opensales -d opensales']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: opensales-postgres-test
+    profiles: [test]
+    restart: 'no'
+    environment:
+      POSTGRES_USER: opensales
+      POSTGRES_PASSWORD: opensales
+      POSTGRES_DB: opensales_test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U opensales -d opensales_test']
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

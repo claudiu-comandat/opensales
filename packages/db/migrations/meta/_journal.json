@@ -1,0 +1,223 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1777991241527,
+      "tag": "0000_nosy_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777993898787,
+      "tag": "0001_white_firedrake",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778002123498,
+      "tag": "0002_wild_invaders",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778100000000,
+      "tag": "0003_order_status_rename",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778200000000,
+      "tag": "0004_product_dedicated_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1747440000000,
+      "tag": "0005_plugin_encrypted_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778300000000,
+      "tag": "0006_ensure_plugin_encrypted_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779000000000,
+      "tag": "0007_plugin_request_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779100000000,
+      "tag": "0005_listings_platform",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0008_order_extended_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0009_product_physical_and_listing_coupling",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779359811895,
+      "tag": "0010_products_ean_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1779359811896,
+      "tag": "0011_products_stock_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779360000000,
+      "tag": "0012_ensure_products_stock_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0013_force_stock_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0014_orders_marketplace",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0015_orders_raw_payload",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1779800000000,
+      "tag": "0016_order_status_undelivered",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1779900000000,
+      "tag": "0017_order_items_quantity_nonzero",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780000000000,
+      "tag": "0018_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780100000000,
+      "tag": "0019_orders_delivery_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1780200000000,
+      "tag": "0020_orders_cancellation_request",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1780300000000,
+      "tag": "0021_import_batches",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1780400000000,
+      "tag": "0022_listing_status_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1780500000000,
+      "tag": "0023_orders_nullable_plugin",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780600000000,
+      "tag": "0024_order_item_substitution",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782100000000,
+      "tag": "0025_fix_trendyol_county",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1782200000000,
+      "tag": "0026_stock_reservation",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1782300000000,
+      "tag": "0027_product_stock_zero_since",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1782400000000,
+      "tag": "0028_workspace_prelist_webhook",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1782500000000,
+      "tag": "0029_stock_contributions",
+      "breakpoints": true
+    }
+  ]
+}

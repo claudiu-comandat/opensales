@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/example",
+  "version": "0.1.0",
+  "displayName": "Example Plugin",
+  "description": "Skeleton plugin pentru OpenSales — referință pentru dezvoltatori.",
+  "type": "utility",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["utility"],
+  "permissions": [],
+  "events": [],
+  "actions": {},
+  "entrypoint": "./dist/index.js"
+}

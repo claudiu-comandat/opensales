@@ -1,0 +1,132 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/fgo",
+  "version": "0.1.0",
+  "displayName": "FGO — Factură Generator Online",
+  "description": "Conector pentru FGO (Factura Generator Online). Emite, anulează, stornează facturi și înregistrează încasări prin API-ul FGO. Suportă mediile PROD și UAT.",
+  "type": "invoicing",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["invoicing"],
+  "permissions": [
+    "orders:read",
+    "orders:write",
+    "invoice:emit",
+    "events:subscribe",
+    "http:outbound"
+  ],
+  "events": ["order.created"],
+  "actions": {
+    "emitInvoice": {
+      "description": "Emite o factură FGO pentru un order existent. Scrie rezultatul în orders.invoice.",
+      "input": {},
+      "output": {}
+    },
+    "cancelInvoice": {
+      "description": "Anulează (anulare) factura emisă pentru un order. Marchează orders.invoice.status='cancelled'.",
+      "input": {},
+      "output": {}
+    },
+    "fgoCancelDirect": {
+      "description": "Anulează factura la FGO fără a scrie în DB. Folosit de platformă înainte de a șterge factura local (cascade delete).",
+      "input": {},
+      "output": {}
+    },
+    "stornoInvoice": {
+      "description": "Stornează factura (credit note). Scrie rezultatul în orders.invoiceStorno.",
+      "input": {},
+      "output": {}
+    },
+    "getInvoiceStatus": {
+      "description": "Citește statusul curent al facturii din FGO (nu modifică DB).",
+      "input": {},
+      "output": {}
+    },
+    "getInvoicePdf": {
+      "description": "Returnează PDF-ul facturii (base64) din FGO.",
+      "input": {},
+      "output": {}
+    },
+    "recordPayment": {
+      "description": "Înregistrează o încasare pe o factură (Premium/Enterprise FGO).",
+      "input": {},
+      "output": {}
+    },
+    "listCountries": {
+      "description": "Nomenclator țări FGO (cod + denumire).",
+      "input": {},
+      "output": {}
+    },
+    "listCounties": {
+      "description": "Nomenclator județe FGO.",
+      "input": {},
+      "output": {}
+    },
+    "listVatRates": {
+      "description": "Nomenclator cote TVA FGO.",
+      "input": {},
+      "output": {}
+    },
+    "listCurrencies": {
+      "description": "Nomenclator valute FGO.",
+      "input": {},
+      "output": {}
+    },
+    "listInvoiceTypes": {
+      "description": "Nomenclator tipuri facturi FGO.",
+      "input": {},
+      "output": {}
+    },
+    "listPaymentTypes": {
+      "description": "Nomenclator tipuri încasare FGO.",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "codUnic",
+        "label": "Cod Unic (CUI)",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "privateKey",
+        "label": "Private Key FGO",
+        "type": "password",
+        "required": true
+      },
+      {
+        "name": "environment",
+        "label": "Mediu (prod / uat)",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "platformUrl",
+        "label": "PlatformaUrl (URL public al platformei, opțional)",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "defaultSerie",
+        "label": "Serie implicită facturi (ex. BV)",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "autoEmitOnOrderCreated",
+        "label": "Emite automat factură la order.created",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "verificareDuplicat",
+        "label": "Verificare duplicat factură la FGO",
+        "type": "boolean",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

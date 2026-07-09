@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ALTER COLUMN "plugin_id" DROP NOT NULL;

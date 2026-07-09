@@ -1,0 +1,170 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/temu",
+  "version": "0.1.0",
+  "displayName": "Temu",
+  "description": "Conector pentru Temu Open API (EU/US/Global). Sincronizează comenzi, produse, stocuri, expedieri, retururi și aftersales.",
+  "type": "marketplace",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["marketplace", "shipping"],
+  "permissions": [
+    "products:read",
+    "products:write",
+    "listings:read",
+    "listings:write",
+    "orders:read",
+    "orders:write",
+    "orders:status:write",
+    "stock:read",
+    "stock:write",
+    "events:emit",
+    "http:outbound"
+  ],
+  "events": ["order.status_changed", "stock.changed", "listing.updated"],
+  "actions": {
+    "createAccessToken": {
+      "description": "Obține access token din authorization code (bg.open.accesstoken.create).",
+      "input": {},
+      "output": {}
+    },
+    "syncOrders": {
+      "description": "Pull comenzile din Temu (paginat, idempotent) — bg.order.list.v2.get.",
+      "input": {},
+      "output": {}
+    },
+    "getOrderDetail": {
+      "description": "Detalii complete ale unei comenzi — bg.order.detail.v2.get.",
+      "input": {},
+      "output": {}
+    },
+    "getShippingInfo": {
+      "description": "Adresa de livrare pentru o comandă — bg.order.shippinginfo.v2.get.",
+      "input": {},
+      "output": {}
+    },
+    "confirmShipment": {
+      "description": "Confirmă expedierea unei comenzi cu tracking — bg.logistics.shipment.v2.confirm.",
+      "input": {},
+      "output": {}
+    },
+    "getLogisticsCompanies": {
+      "description": "Listă curieri disponibili pentru o regiune — bg.logistics.companies.get.",
+      "input": {},
+      "output": {}
+    },
+    "pushGoods": {
+      "description": "Creează un produs nou pe Temu — temu.local.goods.v2.add.",
+      "input": {},
+      "output": {}
+    },
+    "uploadGoodsImage": {
+      "description": "Încarcă o imagine pe CDN-ul Temu — temu.local.goods.image.v2.upload.",
+      "input": {},
+      "output": {}
+    },
+    "syncGoods": {
+      "description": "Pull lista de produse/SKU-uri din Temu.",
+      "input": {},
+      "output": {}
+    },
+    "updateStock": {
+      "description": "Actualizează stocul unui SKU.",
+      "input": {},
+      "output": {}
+    },
+    "updatePrice": {
+      "description": "Actualizează prețul unui SKU — bg.local.goods.partial.update.",
+      "input": {},
+      "output": {}
+    },
+    "setSaleStatus": {
+      "description": "Activează/dezactivează un produs pe Temu — bg.local.goods.status.edit.",
+      "input": {},
+      "output": {}
+    },
+    "readCategories": {
+      "description": "Citește categoriile Temu — bg.local.goods.cats.get.",
+      "input": {},
+      "output": {}
+    },
+    "syncAftersales": {
+      "description": "Pull cererile de retur/aftersales.",
+      "input": {},
+      "output": {}
+    },
+    "refundOrder": {
+      "description": "Inițiază rambursare pentru o comandă.",
+      "input": {},
+      "output": {}
+    },
+    "getBrandTrademarks": {
+      "description": "Listă branduri/trademark înregistrate de vânzător — temu.local.goods.brand.trademark.V2.get.",
+      "input": {},
+      "output": {}
+    },
+    "getComplianceContacts": {
+      "description": "Listă entități GPSR (producător/responsabil EU) — bg.local.goods.compliance.info.fill.list.query.",
+      "input": {},
+      "output": {}
+    },
+    "getProductAttributes": {
+      "description": "Atributele unei categorii (required + valori/unități) — temu.local.product.attributes.get.",
+      "input": {},
+      "output": {}
+    },
+    "getComplianceExtraTemplate": {
+      "description": "Șabloane compliance/guvernanță per categorie — bg.local.goods.compliance.extra.template.get.",
+      "input": {},
+      "output": {}
+    },
+    "editCompliance": {
+      "description": "Completează GPSR + extraTemplate pe un produs — bg.local.goods.compliance.edit.",
+      "input": {},
+      "output": {}
+    },
+    "submitForReview": {
+      "description": "Trimite produsul la validare (saveMode:1, draft → pending review) — bg.local.goods.partial.update.",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "platform",
+        "label": "Platformă (temu-eu / temu-us / temu-global)",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "appKey",
+        "label": "App Key (Temu Partner Platform)",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "appSecret",
+        "label": "App Secret",
+        "type": "password",
+        "required": true
+      },
+      {
+        "name": "accessToken",
+        "label": "Access Token OAuth",
+        "type": "password",
+        "required": true
+      }
+    ]
+  },
+  "configSchema": {
+    "fields": [
+      {
+        "name": "invoiceSeries",
+        "label": "Serie facturi (ex. TMU) — folosită de FGO la emitere pe comenzile acestui marketplace",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

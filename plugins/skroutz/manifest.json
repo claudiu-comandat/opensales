@@ -1,0 +1,118 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/skroutz",
+  "version": "0.1.0",
+  "displayName": "Skroutz",
+  "description": "Conector pentru Skroutz Marketplace (Smart Cart) din Grecia. Postare produse (XML Feed), ingestie comenzi (Orders API + Webhook), update stoc/preț și activare/dezactivare oferte (Products API).",
+  "type": "marketplace",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["marketplace"],
+  "permissions": [
+    "products:read",
+    "products:write",
+    "listings:read",
+    "listings:write",
+    "orders:read",
+    "orders:write",
+    "orders:status:write",
+    "stock:read",
+    "stock:write",
+    "http:outbound"
+  ],
+  "events": ["order.created", "order.status_changed", "stock.changed"],
+  "actions": {
+    "generateProductFeed": {
+      "description": "Generează feed-ul XML Skroutz pentru postarea/publicarea catalogului. Crearea produselor noi se face exclusiv prin XML Feed (Products API nu creează produse).",
+      "input": {},
+      "output": {}
+    },
+    "updateInventory": {
+      "description": "Actualizează stoc, preț (cenți) și disponibilitate (enabled) pentru până la 500 produse într-un batch (Products API).",
+      "input": {},
+      "output": {}
+    },
+    "validateInventory": {
+      "description": "Validează un payload de batch fără a aplica modificările (dry-run).",
+      "input": {},
+      "output": {}
+    },
+    "setOfferActive": {
+      "description": "Activează sau dezactivează o ofertă pe Skroutz (enabled=true/false) ca batch de un singur produs.",
+      "input": {},
+      "output": {}
+    },
+    "getOrder": {
+      "description": "Citește o comandă Skroutz după code (sync periodic sau după webhook).",
+      "input": {},
+      "output": {}
+    },
+    "acceptOrder": {
+      "description": "Acceptă o comandă (pickup_location + pickup_window din accept_options).",
+      "input": {},
+      "output": {}
+    },
+    "rejectOrder": {
+      "description": "Respinge o comandă: per line_item (reason_id) sau întreaga comandă cu rejection_reason_other.",
+      "input": {},
+      "output": {}
+    },
+    "uploadInvoice": {
+      "description": "Încarcă documentul fiscal (pdf/png/jpg, max 7MB) pentru o comandă.",
+      "input": {},
+      "output": {}
+    },
+    "setAsReady": {
+      "description": "Marchează comanda ca pregătită pentru ridicare (Skroutz Last Mile).",
+      "input": {},
+      "output": {}
+    },
+    "setAsNotReady": {
+      "description": "Anulează marcarea „ready” a unei comenzi înainte de ridicarea de către curier.",
+      "input": {},
+      "output": {}
+    },
+    "updateTrackingDetails": {
+      "description": "Setează curierul și codul de tracking pentru o comandă FBM (Fulfilled By Merchant).",
+      "input": {},
+      "output": {}
+    },
+    "parseWebhook": {
+      "description": "Validează și normalizează un payload de webhook Skroutz (new_order / order_updated), extrăgând code + state.",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "ordersToken",
+        "label": "Orders API Token (Merchants > Services > Skroutz Marketplace)",
+        "type": "password",
+        "required": false
+      },
+      {
+        "name": "productsToken",
+        "label": "Products API Token (Merchants > Products > Feed Updates)",
+        "type": "password",
+        "required": false
+      },
+      {
+        "name": "webhookSecret",
+        "label": "Webhook shared secret (opțional, verificat la primirea webhook-urilor)",
+        "type": "password",
+        "required": false
+      }
+    ]
+  },
+  "configSchema": {
+    "fields": [
+      {
+        "name": "invoiceSeries",
+        "label": "Serie facturi folosită la emiterea documentelor fiscale pentru comenzile acestui marketplace",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

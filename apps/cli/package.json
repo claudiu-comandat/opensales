@@ -1,0 +1,30 @@
+{
+  "name": "@opensales/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "opensales": "./dist/main.js",
+    "ops": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx --env-file=../../.env src/main.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opensales/db": "workspace:*",
+    "@opensales/plugin-sdk": "workspace:*",
+    "commander": "^12.1.0",
+    "kleur": "^4.1.5",
+    "ora": "^8.1.0",
+    "simple-git": "^3.27.0",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/tar": "^7.0.87",
+    "tsx": "^4.19.1"
+  }
+}

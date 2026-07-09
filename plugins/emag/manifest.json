@@ -1,0 +1,171 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/emag",
+  "version": "0.1.0",
+  "displayName": "eMAG",
+  "description": "Conector pentru eMAG Marketplace API v4.5.1 (RO/BG/HU + FashionDays). Sincronizează comenzi, oferte/produse, stocuri, AWB-uri (cu volumetrie), RMA, facturi, campanii.",
+  "type": "marketplace",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["marketplace", "shipping"],
+  "permissions": [
+    "products:read",
+    "products:write",
+    "listings:read",
+    "listings:write",
+    "orders:read",
+    "orders:write",
+    "orders:status:write",
+    "stock:read",
+    "stock:write",
+    "awb:emit",
+    "awb:read",
+    "invoice:read",
+    "events:emit",
+    "http:outbound"
+  ],
+  "events": ["order.status_changed", "stock.changed", "listing.updated"],
+  "actions": {
+    "syncOrders": {
+      "description": "Pull comenzile noi din eMAG (paginat, idempotent).",
+      "input": {},
+      "output": {}
+    },
+    "syncOffers": {
+      "description": "Pull ofertele și produsele din eMAG.",
+      "input": {},
+      "output": {}
+    },
+    "pushOffer": {
+      "description": "Trimite la eMAG un produs/ofertă (full sau light update).",
+      "input": {},
+      "output": {}
+    },
+    "pushOffers": {
+      "description": "Trimite la eMAG un batch de oferte într-un singur request (max 50).",
+      "input": {},
+      "output": {}
+    },
+    "saveMeasurements": {
+      "description": "Salvează volumetria (lungime/lățime/înălțime/greutate) ofertelor (measurements/save).",
+      "input": {},
+      "output": {}
+    },
+    "updateStock": {
+      "description": "Actualizează stocul unei oferte (PATCH offer_stock/{id}).",
+      "input": {},
+      "output": {}
+    },
+    "readVatRates": {
+      "description": "Citește ratele TVA disponibile (id + valoare zecimală) pentru marketplace.",
+      "input": {},
+      "output": {}
+    },
+    "acknowledgeOrder": {
+      "description": "Confirmă procesarea unei comenzi (order/acknowledge/{id}).",
+      "input": {},
+      "output": {}
+    },
+    "saveOrder": {
+      "description": "Update unei comenzi (status, courier, products) prin order/save.",
+      "input": {},
+      "output": {}
+    },
+    "issueAwb": {
+      "description": "Emite AWB pentru o comandă (awb/save).",
+      "input": {},
+      "output": {}
+    },
+    "readAwb": {
+      "description": "Citește detalii AWB existente (awb/read).",
+      "input": {},
+      "output": {}
+    },
+    "readAwbPdf": {
+      "description": "Returnează PDF-ul AWB-ului (awb/read_pdf/{emag_id}).",
+      "input": {},
+      "output": {}
+    },
+    "saveAwbPackage": {
+      "description": "Setează pachetele și volumetria pentru AWB (awb/package/save).",
+      "input": {},
+      "output": {}
+    },
+    "readOrderVolumetry": {
+      "description": "Citește datele volumetrice ale unei comenzi (order/volumetry/read).",
+      "input": {},
+      "output": {}
+    },
+    "syncRma": {
+      "description": "Pull cererile de retur (rma/read).",
+      "input": {},
+      "output": {}
+    },
+    "saveRma": {
+      "description": "Update unei cereri de retur (rma/save).",
+      "input": {},
+      "output": {}
+    },
+    "proposeCampaign": {
+      "description": "Propune oferta într-o campanie (campaign_proposals/save).",
+      "input": {},
+      "output": {}
+    },
+    "readCategories": {
+      "description": "Citește categoriile + characteristics + family_types.",
+      "input": {},
+      "output": {}
+    },
+    "findByEan": {
+      "description": "Caută produse existente după EAN (documentation/find_by_eans).",
+      "input": {},
+      "output": {}
+    },
+    "readCommission": {
+      "description": "Citește comisionul pentru o ofertă.",
+      "input": {},
+      "output": {}
+    },
+    "checkSmartDealsPrice": {
+      "description": "Verifică prețul țintă pentru badge Smart Deals.",
+      "input": {},
+      "output": {}
+    },
+    "updatePrice": {
+      "description": "Actualizează DOAR prețul ofertei prin light offer/save (fără re-validare documentație).",
+      "input": {},
+      "output": {}
+    },
+    "registerCallback": {
+      "description": "Înregistrează URL-ul de callback la eMAG (suprascrie cel existent).",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "username",
+        "label": "Username API eMAG",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "password",
+        "label": "Parolă API eMAG",
+        "type": "password",
+        "required": true
+      }
+    ]
+  },
+  "configSchema": {
+    "fields": [
+      {
+        "name": "invoiceSeries",
+        "label": "Serie facturi (ex. EMG) — folosită de FGO la emitere pe comenzile acestui marketplace",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

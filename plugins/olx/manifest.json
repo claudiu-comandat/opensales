@@ -1,0 +1,98 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/olx",
+  "version": "0.1.0",
+  "displayName": "OLX.ro",
+  "description": "Conector pentru OLX.ro (OLX Europe Partner API v2). Publică și sincronizează anunțuri (adverts), citește categorii/atribute și gestionează mesajele cumpărătorilor. Auth OAuth2 (client_credentials pentru config, authorization_code pentru acțiuni de utilizator) cu header obligatoriu Version: 2.0.",
+  "type": "marketplace",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["marketplace"],
+  "permissions": [
+    "products:read",
+    "listings:read",
+    "listings:write",
+    "events:emit",
+    "http:outbound"
+  ],
+  "events": ["listing.created", "listing.updated", "listing.deleted"],
+  "actions": {
+    "syncCategories": {
+      "description": "Pull lista de categorii OLX (opțional sub un parent_id). Context client_credentials.",
+      "input": {},
+      "output": {}
+    },
+    "readCategoryAttributes": {
+      "description": "Citește definițiile de atribute (cod, label, validare, valori) pentru o categorie OLX.",
+      "input": {},
+      "output": {}
+    },
+    "createAdvert": {
+      "description": "Publică un anunț nou pe OLX (POST /adverts). Context authorization_code (user).",
+      "input": {},
+      "output": {}
+    },
+    "updateAdvert": {
+      "description": "Actualizează un anunț existent (PUT /adverts/{id}).",
+      "input": {},
+      "output": {}
+    },
+    "deleteAdvert": {
+      "description": "Șterge un anunț (DELETE /adverts/{id}). Anunțul nu trebuie să fie activ — dezactivează-l întâi.",
+      "input": {},
+      "output": {}
+    },
+    "syncAdverts": {
+      "description": "Listează anunțurile utilizatorului, paginat (GET /adverts?offset&limit).",
+      "input": {},
+      "output": {}
+    },
+    "advertCommand": {
+      "description": "Execută o comandă pe un anunț: activate / deactivate / finish / extend (POST /adverts/{id}/commands).",
+      "input": {},
+      "output": {}
+    },
+    "readMessages": {
+      "description": "Citește mesajele dintr-un thread OLX (GET /threads/{id}/messages).",
+      "input": {},
+      "output": {}
+    },
+    "sendMessage": {
+      "description": "Trimite un mesaj într-un thread OLX (POST /threads/{id}/messages).",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "clientId",
+        "label": "Client ID OLX",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "clientSecret",
+        "label": "Client Secret OLX",
+        "type": "password",
+        "required": true
+      },
+      {
+        "name": "refreshToken",
+        "label": "Refresh Token utilizator OLX (obținut prin flow-ul authorization_code)",
+        "type": "password",
+        "required": false
+      }
+    ]
+  },
+  "configSchema": {
+    "fields": [
+      {
+        "name": "callbackUrl",
+        "label": "Callback URL înregistrat la OLX (pentru flow-ul authorization_code)",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

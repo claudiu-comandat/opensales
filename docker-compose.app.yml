@@ -1,0 +1,67 @@
+# OpenSales — full self-hosted stack (n8n-style: postgres + api + web).
+#
+# One-command launch:
+#   docker compose -f docker-compose.app.yml up -d --build
+#
+# Then open http://localhost:3000 (web) and http://localhost:3001/api-docs (api).
+# All secrets are auto-generated on first boot and persisted in the
+# `opensales-data` volume — no manual env wrangling required.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opensales
+      POSTGRES_PASSWORD: opensales
+      POSTGRES_DB: opensales
+    volumes:
+      - opensales-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U opensales -d opensales']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgres://opensales:opensales@postgres:5432/opensales
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@opensales.local}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-ChangeMeAfterFirstLogin!}
+      # PLATFORM_MASTER_KEY and SESSION_SECRET are auto-generated on first
+      # boot and persisted in opensales-data. To override, set them here.
+    ports:
+      - '3001:3001'
+    volumes:
+      - opensales-data:/app/data
+      - opensales-plugins:/app/plugins
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3001}
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+
+volumes:
+  opensales-postgres:
+  opensales-data:
+  opensales-plugins:

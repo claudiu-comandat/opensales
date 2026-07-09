@@ -1,0 +1,127 @@
+{
+  "$schema": "https://railway.com/schema/template.json",
+  "name": "OpenSales",
+  "description": "Self-hosted e-commerce management platform with plugin engine. Deploys API + Web + Postgres in one click.",
+  "icon": "https://raw.githubusercontent.com/comandat/ops-dev-2/main/apps/web/public/favicon.ico",
+  "category": "ECommerce",
+  "tags": ["ecommerce", "marketplace", "plugins", "nestjs", "nextjs"],
+
+  "services": [
+    {
+      "id": "postgres",
+      "name": "Postgres",
+      "icon": "https://devicons.railway.com/i/postgresql.svg",
+      "source": {
+        "image": "postgres:16-alpine"
+      },
+      "variables": {
+        "POSTGRES_USER": {
+          "default": "opensales",
+          "description": "Postgres role used by the API."
+        },
+        "POSTGRES_PASSWORD": {
+          "default": "${{ secret(32) }}",
+          "description": "Auto-generated 32-char password."
+        },
+        "POSTGRES_DB": {
+          "default": "opensales",
+          "description": "Database name."
+        }
+      },
+      "volumes": [
+        {
+          "name": "postgres-data",
+          "mountPath": "/var/lib/postgresql/data"
+        }
+      ]
+    },
+
+    {
+      "id": "api",
+      "name": "API",
+      "icon": "https://devicons.railway.com/i/typescript.svg",
+      "source": {
+        "repo": "comandat/ops-dev-2"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "Dockerfile"
+      },
+      "deploy": {
+        "healthcheckPath": "/healthz",
+        "healthcheckTimeout": 30,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
+      "variables": {
+        "DATABASE_URL": {
+          "default": "${{ Postgres.DATABASE_URL }}",
+          "description": "Auto-wired from Postgres service."
+        },
+        "WEB_URL": {
+          "default": "https://${{ Web.RAILWAY_PUBLIC_DOMAIN }}",
+          "description": "CORS origin for the admin UI."
+        },
+        "PLATFORM_VERSION": {
+          "default": "0.1.0"
+        },
+        "PLUGINS_ROOT": {
+          "default": "/app/plugins"
+        },
+        "SECRETS_DIR": {
+          "default": "/app/data/secrets"
+        },
+        "INITIAL_ADMIN_EMAIL": {
+          "default": "admin@opensales.local",
+          "description": "First-boot admin email; remove after first login."
+        },
+        "INITIAL_ADMIN_PASSWORD": {
+          "default": "${{ secret(20) }}",
+          "description": "Auto-generated 20-char password. Check the deploy logs to retrieve it, then change it from the UI."
+        },
+        "LOG_LEVEL": {
+          "default": "info"
+        },
+        "NODE_ENV": {
+          "default": "production"
+        }
+      },
+      "volumes": [
+        {
+          "name": "api-data",
+          "mountPath": "/app/data"
+        },
+        {
+          "name": "api-plugins",
+          "mountPath": "/app/plugins"
+        }
+      ]
+    },
+
+    {
+      "id": "web",
+      "name": "Web",
+      "icon": "https://devicons.railway.com/i/nextjs.svg",
+      "source": {
+        "repo": "comandat/ops-dev-2"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "apps/web/Dockerfile"
+      },
+      "deploy": {
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
+      "variables": {
+        "NEXT_PUBLIC_API_URL": {
+          "default": "https://${{ API.RAILWAY_PUBLIC_DOMAIN }}",
+          "description": "Public URL of the API service."
+        },
+        "NODE_ENV": {
+          "default": "production"
+        }
+      }
+    }
+  ]
+}

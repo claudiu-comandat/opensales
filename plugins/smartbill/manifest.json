@@ -1,0 +1,123 @@
+{
+  "$schema": "https://opensales.dev/schemas/plugin-manifest.json",
+  "packageName": "@opensales-plugin/smartbill",
+  "version": "0.1.0",
+  "displayName": "SmartBill Cloud",
+  "description": "Conector pentru SmartBill Cloud. Emite, anulează (anulare), șterge, stornează și restaurează facturi, interoghează starea încasării, descarcă PDF-ul și înregistrează încasări prin API-ul REST SmartBill (https://ws.smartbill.ro/SBORO/api). Autentificare Basic (email + token), CIF per firmă.",
+  "type": "invoicing",
+  "platformVersion": "^0.1.0",
+  "capabilities": ["invoicing"],
+  "permissions": [
+    "orders:read",
+    "orders:write",
+    "invoice:emit",
+    "events:subscribe",
+    "http:outbound"
+  ],
+  "events": ["order.created"],
+  "actions": {
+    "emitInvoice": {
+      "description": "Emite o factură SmartBill pentru un order existent. Scrie rezultatul în orders.invoice.",
+      "input": {},
+      "output": {}
+    },
+    "cancelInvoice": {
+      "description": "Anulează (anulare) factura emisă pentru un order — păstrează documentul în SmartBill. Marchează orders.invoice.status='cancelled'.",
+      "input": {},
+      "output": {}
+    },
+    "smartbillDeleteDirect": {
+      "description": "Șterge factura din SmartBill (DELETE /invoice, doar ultima din serie) fără a scrie în DB. Folosit de platformă înainte de a șterge factura local (cascade delete).",
+      "input": {},
+      "output": {}
+    },
+    "stornoInvoice": {
+      "description": "Stornează factura (factură storno). Scrie rezultatul în orders.invoiceStorno.",
+      "input": {},
+      "output": {}
+    },
+    "restoreInvoice": {
+      "description": "Restaurează o factură anulată în prealabil. Marchează orders.invoice.status='issued'.",
+      "input": {},
+      "output": {}
+    },
+    "getInvoicePaymentStatus": {
+      "description": "Citește starea încasării facturii din SmartBill (total facturat / încasat / rămas). Nu modifică DB.",
+      "input": {},
+      "output": {}
+    },
+    "getInvoicePdf": {
+      "description": "Returnează PDF-ul facturii (base64) din SmartBill.",
+      "input": {},
+      "output": {}
+    },
+    "recordPayment": {
+      "description": "Înregistrează o încasare pe o factură emisă (POST /payment).",
+      "input": {},
+      "output": {}
+    },
+    "listVatRates": {
+      "description": "Nomenclator cote TVA definite în contul SmartBill (GET /tax).",
+      "input": {},
+      "output": {}
+    },
+    "listSeries": {
+      "description": "Nomenclator serii de documente definite în contul SmartBill (GET /series).",
+      "input": {},
+      "output": {}
+    }
+  },
+  "secretSchema": {
+    "fields": [
+      {
+        "name": "companyVatCode",
+        "label": "CIF firmă (ex. RO12345678)",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "username",
+        "label": "Email cont SmartBill Cloud",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "token",
+        "label": "Token API SmartBill (Contul Meu > Integrări > API)",
+        "type": "password",
+        "required": true
+      },
+      {
+        "name": "defaultSeriesName",
+        "label": "Serie implicită facturi (ex. FCT)",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "language",
+        "label": "Limbă document (ex. RO)",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "useStock",
+        "label": "Operează stocul la emitere",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "saveClientToDb",
+        "label": "Salvează clientul în nomenclatorul SmartBill",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "autoEmitOnOrderCreated",
+        "label": "Emite automat factură la order.created",
+        "type": "boolean",
+        "required": false
+      }
+    ]
+  },
+  "entrypoint": "./dist/index.js"
+}

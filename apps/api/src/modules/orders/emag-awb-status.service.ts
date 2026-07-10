@@ -8,6 +8,8 @@ import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 import { type LoadedPlugin } from '../plugins/types.js';
 
+import { marketplaceToPlatform } from './emag-awb-issue.service.js';
+
 type OrderAwbStatus = schema.OrderAwb['status'];
 
 const TERMINAL_STATUSES: OrderAwbStatus[] = ['delivered', 'returned', 'cancelled'];
@@ -95,6 +97,8 @@ export class EmagAwbStatusService {
     try {
       items = (await invokeAction(loadedPlugin.instance, 'readAwb', {
         emag_id: awb.emag_id,
+        // Citește statusul AWB de pe țara comenzii (emag-hu ≠ emag-ro), altfel eMAG respinge.
+        platform: marketplaceToPlatform(order.marketplace) ?? undefined,
       })) as AwbReadResult[];
     } catch (err) {
       this.logger.warn(

@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 
+import { marketplaceToPlatform } from './emag-awb-issue.service.js';
+
 export interface AwbPdfResult {
   pdfBase64: string;
   contentType: string | undefined;
@@ -45,6 +47,8 @@ export class EmagAwbPdfService {
     const result = (await invokeAction(loadedPlugin.instance, 'readAwbPdf', {
       emag_id: emagId,
       format: 'A6',
+      // Rutează citirea spre țara pe care s-a emis AWB-ul (emag-hu ≠ emag-ro).
+      platform: marketplaceToPlatform(order.marketplace) ?? undefined,
     })) as { bytes: Uint8Array; contentType: string | null };
 
     const pdfBase64 = Buffer.from(result.bytes).toString('base64');
@@ -75,6 +79,8 @@ export class EmagAwbPdfService {
     const result = (await invokeAction(loadedPlugin.instance, 'readAwbPdf', {
       emag_id: emagId,
       format: 'A6',
+      // Rutează citirea spre țara pe care s-a emis AWB-ul (emag-hu ≠ emag-ro).
+      platform: marketplaceToPlatform(order.marketplace) ?? undefined,
     })) as { bytes: Uint8Array; contentType: string | null };
 
     return {

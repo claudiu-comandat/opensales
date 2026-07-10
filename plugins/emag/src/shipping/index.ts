@@ -107,6 +107,12 @@ const readAwbInputSchema = z.object({
   rma_id: z.number().int().optional(),
   itemsPerPage: z.number().int().min(1).max(100).optional(),
   currentPage: z.number().int().min(1).optional(),
+  /**
+   * Platforma eMAG a comenzii (emag-ro/emag-hu/emag-bg/...) — selectează clientul API
+   * corect. AWB-ul aparține contului țării pe care a fost emis; citirea de pe altă țară
+   * dă „Vendor is not the AWB's owner". Nu e trimis către eMAG.
+   */
+  platform: z.string().optional(),
 });
 
 const readAwbOutputSchema = z.array(
@@ -125,6 +131,12 @@ const readAwbOutputSchema = z.array(
 const readAwbPdfInputSchema = z.object({
   emag_id: z.number().int().min(1),
   format: z.enum(['A4', 'A5', 'A6', 'ZPL']).optional(),
+  /**
+   * Platforma eMAG a comenzii (emag-ro/emag-hu/emag-bg/...) — selectează clientul API
+   * corect. AWB-ul aparține contului țării pe care a fost emis; citirea de pe altă țară
+   * dă „Vendor is not the AWB's owner". Nu e trimis către eMAG.
+   */
+  platform: z.string().optional(),
 });
 
 const readAwbPdfOutputSchema = z.object({
@@ -220,8 +232,10 @@ export function shippingActions(
       input: readAwbInputSchema,
       output: readAwbOutputSchema as unknown as z.ZodType<AwbReadItem[]>,
       handle: async (input: ReadAwbInput): Promise<AwbReadItem[]> => {
-        const client = await getClientFor();
-        const filters = stripUndefined(input) as AwbReadFilters;
+        // `platform` rutează clientul spre țara AWB-ului; nu e câmp eMAG, îl scoatem din filtre.
+        const { platform, ...rest } = input as ReadAwbInput & { platform?: string };
+        const client = await getClientFor(platform as EmagPlatformKey | undefined);
+        const filters = stripUndefined(rest) as AwbReadFilters;
         return readAwb(client, filters);
       },
     },
@@ -229,7 +243,12 @@ export function shippingActions(
       input: readAwbPdfInputSchema,
       output: readAwbPdfOutputSchema,
       handle: async (input: ReadAwbPdfInput): Promise<ReadAwbPdfOutput> => {
-        const client = await getClientFor();
+        // Rutează spre țara pe care s-a emis AWB-ul (altfel „Vendor is not the AWB's owner").
+        const client = await getClientFor(
+          (input as ReadAwbPdfInput & { platform?: string }).platform as
+            | EmagPlatformKey
+            | undefined,
+        );
         const fmt: AwbPdfFormat = input.format ?? 'A4';
         return readAwbPdf(client, input.emag_id, fmt);
       },

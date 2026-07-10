@@ -63,6 +63,17 @@ export class OrdersService {
     if (input.placedAfter) filters.push(gte(schema.orders.placedAt, input.placedAfter));
     if (input.placedBefore) filters.push(lte(schema.orders.placedAt, input.placedBefore));
 
+    // --- Lookup după AWB (livrare sau retur) pentru procesarea retururilor din depozit ---
+    // Un colet neridicat/returnat nu e niciodată mai vechi de 3 luni, deci restrângem și pe
+    // recență ca lookup-ul să rămână ieftin. Aceleași câmpuri jsonb ca filtrul hasAwb de mai jos.
+    if (input.awb) {
+      filters.push(
+        sql`(${schema.orders.awbOutgoing}->>'number' = ${input.awb}
+          OR ${schema.orders.awbReturn}->>'number' = ${input.awb})
+          AND ${schema.orders.placedAt} >= now() - interval '3 months'`,
+      );
+    }
+
     // --- Full-text search ---
     if (input.search) {
       const term = `%${input.search}%`;

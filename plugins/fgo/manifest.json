@@ -36,6 +36,11 @@
       "input": {},
       "output": {}
     },
+    "emitReturnInvoice": {
+      "description": "Emite o factură nouă pentru liniile rămase după un retur parțial/total, opțional cu o linie de Taxă Returnare. Scrie rezultatul în orders.invoice — apelantul stornează întâi factura activă cu stornoInvoice.",
+      "input": {},
+      "output": {}
+    },
     "getInvoiceStatus": {
       "description": "Citește statusul curent al facturii din FGO (nu modifică DB).",
       "input": {},

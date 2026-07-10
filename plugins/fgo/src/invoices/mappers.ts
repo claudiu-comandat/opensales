@@ -9,7 +9,7 @@ import type { FgoClientInfo, FgoEmitInput, FgoEmitResponse, FgoLineItem } from '
  * Acceptă bigint, number sau string pentru câmpurile monetare (cross-boundary
  * serialization poate transforma bigint → string).
  */
-const amountSchema = z.union([
+export const amountSchema = z.union([
   z.bigint(),
   z.number().int().nonnegative(),
   z.string().regex(/^\d+$/),
@@ -31,7 +31,7 @@ const addressSchema = z
   })
   .passthrough();
 
-const orderItemSchema = z
+export const orderItemSchema = z
   .object({
     sku: z.string(),
     name: z.string(),
@@ -84,6 +84,8 @@ export interface BuildFgoEmitInputOptions {
   defaultUm?: string | undefined;
   /** Tip factură din nomenclatorul FGO (default 'Normala'). */
   defaultTipFactura?: string | undefined;
+  /** Linie suplimentară liberă adăugată la finalul facturii (ex. taxă de retur). */
+  extraLine?: { name: string; amountMinor: number | bigint | string } | undefined;
 }
 
 const DEFAULT_VAT = 0;
@@ -154,6 +156,17 @@ export function buildFgoEmitInput(
       CotaTVA: DEFAULT_VAT,
       PretUnitar: minorToMajor(order.vouchersMinor),
       CodArticol: 'VOUCHER',
+    });
+  }
+
+  if (options.extraLine) {
+    continut.push({
+      Denumire: options.extraLine.name,
+      NrProduse: 1,
+      UM: options.defaultUm ?? DEFAULT_UM,
+      CotaTVA: DEFAULT_VAT,
+      PretUnitar: minorToMajor(options.extraLine.amountMinor),
+      CodArticol: 'RETUR',
     });
   }
 

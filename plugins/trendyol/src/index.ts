@@ -11,6 +11,7 @@ import { type z } from 'zod';
 import manifest from '../manifest.json' with { type: 'json' };
 
 import { categoryActions } from './categories/index.js';
+import { claimActions } from './claims/index.js';
 import { TrendyolApiError, TrendyolClient } from './client.js';
 import {
   SecretSchema,
@@ -137,6 +138,12 @@ const allActions: ActionHandlerMap = {
   cancelPackage: adaptAction(orderActions.cancelPackage),
   getAwbLabel: adaptAction(orderActions.getAwbLabel),
   sendInvoiceLink: adaptAction(orderActions.sendInvoiceLink),
+
+  // ── Claims (retururi) ────────────────────────────────────────────────────────
+  getClaims: adaptRoutableAction(claimActions.getClaims),
+  getClaimIssueReasons: adaptRoutableAction(claimActions.getClaimIssueReasons),
+  approveClaim: adaptRoutableAction(claimActions.approveClaim),
+  rejectClaim: adaptRoutableAction(claimActions.rejectClaim),
 
   // ── Webhooks ──────────────────────────────────────────────────────────────────
   createWebhook: adaptAction(webhookActions.createWebhook),

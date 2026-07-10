@@ -2,6 +2,7 @@ export * from './api-keys.js';
 export * from './import-batches.js';
 export * from './listings.js';
 export * from './order-items.js';
+export * from './order-returns.js';
 export * from './orders.js';
 export * from './plugin-request-log.js';
 export * from './plugins.js';

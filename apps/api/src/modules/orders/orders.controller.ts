@@ -36,6 +36,7 @@ import { EmagAwbIssueService, marketplaceToPlatform } from './emag-awb-issue.ser
 import { EmagAwbPdfService } from './emag-awb-pdf.service.js';
 import { EmagOrderActionsService } from './emag-order-actions.service.js';
 import { EmagOrderSyncService } from './emag-order-sync.service.js';
+import { OrderReturnsService } from './order-returns.service.js';
 import { OrdersService } from './orders.service.js';
 import { TemuAwbService } from './temu-awb.service.js';
 import { TemuOrderSyncService } from './temu-order-sync.service.js';
@@ -62,6 +63,7 @@ export class OrdersController {
     private readonly temuSync: TemuOrderSyncService,
     private readonly temuAwb: TemuAwbService,
     private readonly trendyolAwb: TrendyolAwbService,
+    private readonly orderReturns: OrderReturnsService,
   ) {}
 
   @Get()
@@ -354,6 +356,50 @@ export class OrdersController {
     const { products } = bodySchema.parse(body);
     await this.emagActions.stornoPartial(id, products);
     return { ok: true };
+  }
+
+  @Get(':id/returns')
+  @Roles('admin', 'operator')
+  @Scopes('orders:read')
+  async listReturns(@Param('id') id: string) {
+    return this.orderReturns.listReturns(id);
+  }
+
+  @Post(':id/return')
+  @HttpCode(200)
+  @Roles('admin', 'operator')
+  @Scopes('orders:write')
+  async processReturn(@Param('id') id: string, @Body() body: unknown) {
+    const bodySchema = z
+      .object({
+        items: z.array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(1) })),
+        source: z.enum(['emag_rma', 'trendyol_claim', 'manual']),
+        sourceReference: z.string().min(1).optional(),
+        // O taxă de 0 nu e o taxă — o respingem ca să evităm ambiguitatea 0 vs undefined în serviciu.
+        feeAmountMinor: z.number().int().positive().optional(),
+        feeCurrency: z.string().length(3).optional(),
+        comment: z.string().optional(),
+      })
+      // Sursele de marketplace au nevoie de sourceReference pentru deduplicare (vezi DB CHECK).
+      .refine((b) => b.source === 'manual' || !!b.sourceReference, {
+        message:
+          'sourceReference obligatoriu pentru surse de marketplace (emag_rma/trendyol_claim)',
+        path: ['sourceReference'],
+      })
+      // Regula casei: sumă + monedă mereu împreună.
+      .refine((b) => (b.feeAmountMinor === undefined) === (b.feeCurrency === undefined), {
+        message: 'feeAmountMinor și feeCurrency trebuie trimise împreună',
+        path: ['feeCurrency'],
+      });
+    const input = bodySchema.parse(body);
+    const orderReturn = await this.orderReturns.processPartialReturnBySku(id, input.items, {
+      source: input.source,
+      sourceReference: input.sourceReference,
+      feeAmountMinor: input.feeAmountMinor,
+      feeCurrency: input.feeCurrency,
+      comment: input.comment,
+    });
+    return { ok: true, orderReturn };
   }
 
   @Post(':id/emag-cancel')

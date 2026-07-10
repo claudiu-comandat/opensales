@@ -97,6 +97,26 @@
       "input": {},
       "output": {}
     },
+    "getClaims": {
+      "description": "Pull cererile de retur (claims) din Trendyol — doc § 8, regiunea CEE.",
+      "input": {},
+      "output": {}
+    },
+    "getClaimIssueReasons": {
+      "description": "Motivele de respingere a unui claim (doc Claim Issue Reasons).",
+      "input": {},
+      "output": {}
+    },
+    "approveClaim": {
+      "description": "Aprobă un claim Trendyol (doar status WaitingInAction).",
+      "input": {},
+      "output": {}
+    },
+    "rejectClaim": {
+      "description": "Respinge un claim Trendyol (createClaimIssue) — poză obligatorie cu excepția motivelor 1651/451/2101.",
+      "input": {},
+      "output": {}
+    },
     "createWebhook": {
       "description": "Creează un abonament webhook pentru notificări de comenzi.",
       "input": {},

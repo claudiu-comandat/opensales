@@ -10,11 +10,15 @@ import { z } from 'zod';
 import { type FgoClient, type FgoClientProvider } from '../client.js';
 
 import {
+  amountSchema,
   buildFgoEmitInput,
   fromFgoEmitResponse,
+  orderItemSchema,
   orderWithItemsSchema,
   toCancelledInvoice,
 } from './mappers.js';
+
+import type { OrderWithItems } from './mappers.js';
 
 // Invoices imported from marketplaces store the full reference (e.g. "E 5137") in `number`
 // with `series=''`. Split them so FGO receives separate Serie/Numar fields.
@@ -68,6 +72,22 @@ const stornoInputSchema = z.object({
 const stornoOutputSchema = z.object({
   series: z.string(),
   number: z.string(),
+});
+
+// `items` sunt liniile RĂMASE de facturat (deja calculate de platformă — comanda originală
+// minus tot ce s-a returnat până acum). Pluginul nu decide plafonul/regulile de retur, doar
+// construiește factura din ce primește (consistent cu restul integrării: regulile rămân la
+// apelant, nu se duplică în plugin).
+const emitReturnInputSchema = z.object({
+  orderId: z.string().min(1),
+  items: z.array(orderItemSchema),
+  feeAmountMinor: amountSchema.optional(),
+  feeCurrency: z.string().length(3).optional(),
+});
+const emitReturnOutputSchema = z.object({
+  series: z.string(),
+  number: z.string(),
+  issuedAt: z.string(),
 });
 
 const statusInputSchema = z.object({
@@ -266,6 +286,39 @@ export function buildInvoiceActions(
     },
   };
 
+  // ── emitReturnInvoice ──────────────────────────────────────────────────────
+  // Emite o factură NOUĂ pentru liniile rămase după un retur parțial/total, opțional cu o
+  // linie de "Taxă Returnare". NU stornează — apelantul (OrderReturnsService) apelează întâi
+  // `stornoInvoice` pe factura activă, apoi asta. API-ul oficial FGO nu are stornare parțială
+  // (doar Numar/Serie, /factura/stornare) — storno complet + reemitere corectată e singura cale.
+  const emitReturnHandler: ActionHandler<
+    z.infer<typeof emitReturnInputSchema>,
+    z.infer<typeof emitReturnOutputSchema>
+  > = {
+    input: emitReturnInputSchema,
+    output: emitReturnOutputSchema,
+    handle: async (input) => {
+      const ctx = ctxProvider();
+      const api = getSdkApi(ctx);
+      const order = await loadOrder(api, input.orderId);
+      const client = await clientProvider();
+      const cfg = emitConfigProvider();
+      const effectiveSerie = order.marketplaceInvoiceSeries ?? cfg.defaultSerie;
+      const orderForReissue: OrderWithItems = { ...order, items: input.items };
+      const fgoInput = buildFgoEmitInput(orderForReissue, {
+        ...cfg,
+        defaultSerie: effectiveSerie ?? undefined,
+        ...(input.feeAmountMinor !== undefined
+          ? { extraLine: { name: 'Taxă Returnare', amountMinor: input.feeAmountMinor } }
+          : {}),
+      });
+      const res = await client.emit(fgoInput);
+      const invoice = fromFgoEmitResponse(res);
+      await api.orders.updateInvoice(input.orderId, invoice);
+      return { series: invoice.series, number: invoice.number, issuedAt: invoice.issuedAt };
+    },
+  };
+
   // ── getInvoiceStatus ───────────────────────────────────────────────────────
   const statusHandler: ActionHandler<
     z.infer<typeof statusInputSchema>,
@@ -424,6 +477,7 @@ export function buildInvoiceActions(
     cancelInvoice: cancelHandler as unknown as ActionHandler<unknown, unknown>,
     fgoCancelDirect: cancelDirectHandler as unknown as ActionHandler<unknown, unknown>,
     stornoInvoice: stornoHandler as unknown as ActionHandler<unknown, unknown>,
+    emitReturnInvoice: emitReturnHandler as unknown as ActionHandler<unknown, unknown>,
     getInvoiceStatus: statusHandler as unknown as ActionHandler<unknown, unknown>,
     getInvoicePdf: pdfHandler as unknown as ActionHandler<unknown, unknown>,
     recordPayment: recordPaymentHandler as unknown as ActionHandler<unknown, unknown>,

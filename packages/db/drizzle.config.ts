@@ -9,6 +9,7 @@ export default defineConfig({
     './src/schema/listings.ts',
     './src/schema/orders.ts',
     './src/schema/order-items.ts',
+    './src/schema/order-returns.ts',
     './src/schema/plugin-request-log.ts',
     './src/schema/sessions.ts',
     './src/schema/stock-contributions.ts',

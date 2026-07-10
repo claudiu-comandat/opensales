@@ -277,6 +277,70 @@ export class TrendyolClient {
     return this.request<T>('POST', path, body);
   }
 
+  /** POST multipart/form-data (ex. respingere claim cu fotografie atașată). */
+  async postMultipart<T>(path: string, form: FormData): Promise<T> {
+    await this.rateLimiter.acquire();
+    const url = this.baseUrl + path;
+    const start = Date.now();
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: this.authHeader,
+          'User-Agent': this.userAgent,
+          storeFrontCode: this.storeFrontCode,
+          Accept: 'application/json',
+        },
+        body: form,
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      this.trace({ method: 'POST', path, url, durationMs: Date.now() - start, error: String(err) });
+      throw err;
+    }
+
+    if (!response.ok) {
+      let raw: unknown;
+      try {
+        raw = await response.json();
+      } catch {
+        raw = null;
+      }
+      this.trace({
+        method: 'POST',
+        path,
+        url,
+        status: response.status,
+        responseBody: raw,
+        durationMs: Date.now() - start,
+      });
+      const rawSummary = raw !== null ? ` — ${JSON.stringify(raw).slice(0, 1000)}` : '';
+      throw new TrendyolApiError(
+        `Trendyol API POST ${path} → HTTP ${response.status}${rawSummary}`,
+        response.status,
+        path,
+        raw,
+      );
+    }
+
+    if (response.status === 204) {
+      this.trace({ method: 'POST', path, url, status: 204, durationMs: Date.now() - start });
+      return undefined as T;
+    }
+
+    const data = (await response.json()) as T;
+    this.trace({
+      method: 'POST',
+      path,
+      url,
+      status: response.status,
+      responseBody: data,
+      durationMs: Date.now() - start,
+    });
+    return data;
+  }
+
   put<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>('PUT', path, body);
   }

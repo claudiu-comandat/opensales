@@ -189,15 +189,16 @@ export class UpdateProductContentWorker implements OnApplicationBootstrap {
       if (changed.has('images')) next.images = product.images;
       if (changed.has('name')) next.title = product.name;
       if (changed.has('description')) next.description = product.description ?? undefined;
-      // Stoc/preț au fallback la produs în mapper + worker-e light dedicate. Doar
+      // Stocul are fallback la produs în mapper + worker light dedicat. Doar
       // REÎMPROSPĂTĂM un override per-ofertă existent (nu creăm unul nou), ca să nu
       // mascăm update-urile la nivel de produs și să nu suprascriem stocul light.
       if (changed.has('stockQuantity') && listing.syncState.stock_quantity !== undefined) {
         next.stock_quantity = product.stockQuantity;
       }
-      if (changed.has('priceAmountMinor') && listing.syncState.price_amount_minor !== undefined) {
-        next.price_amount_minor = String(product.priceAmountMinor);
-      }
+      // Prețul NU se atinge aici: propagatePriceOnly (products.service.ts) rulează
+      // sincron înainte de acest job și scrie deja price_amount_minor convertit în
+      // moneda listării + price_currency. Suprascrierea cu product.priceAmountMinor
+      // brut (nekonvertit, fără currency) ar corupe listările în altă monedă decât RON.
       updated.push(await this.listings.setSyncState(listing.id, next));
     }
     return updated;

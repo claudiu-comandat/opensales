@@ -3,6 +3,7 @@ import { type schema } from '@opensales/db';
 import { type Plugin, invokeAction } from '@opensales/plugin-sdk';
 import { Logger } from 'nestjs-pino';
 
+import { DomainError } from '../../../errors/domain.error.js';
 import { JobQueueService } from '../../../jobs/job-queue.service.js';
 import { ListingsService } from '../../listings/listings.service.js';
 import { trendyolStorefrontFor } from '../../marketplaces/marketplace-catalog.js';
@@ -102,34 +103,50 @@ export class UpdateProductContentWorker implements OnApplicationBootstrap {
     const trendyolEntries: TrendyolEntry[] = [];
 
     for (const { productId, changedFields } of job.items) {
-      const product = await this.products.get(productId);
-      const allListings = await this.listings.listByProduct(productId);
-      if (allListings.length === 0) continue;
-      const changed = new Set(changedFields);
+      try {
+        const product = await this.products.get(productId);
+        const allListings = await this.listings.listByProduct(productId);
+        if (allListings.length === 0) continue;
+        const changed = new Set(changedFields);
 
-      // 1) Suprascrie syncState-ul ofertelor (eMAG + Trendyol) cu datele produsului.
-      const updated = await this.overwriteSyncState(allListings, product, changed);
+        // 1) Suprascrie syncState-ul ofertelor (eMAG + Trendyol) cu datele produsului.
+        const updated = await this.overwriteSyncState(allListings, product, changed);
 
-      // 2a) eMAG: agregă listing-urile per (plugin, marketplace) — pushEmag împarte 50.
-      for (const listing of updated.filter((l) => isEmag(l.platform))) {
-        const key = `${listing.pluginId}:${listing.platform}`;
-        const existing = emagJobs.get(key);
-        if (existing) existing.listingIds.push(listing.id);
-        else
-          emagJobs.set(key, {
-            pluginId: listing.pluginId,
-            marketplace: listing.platform,
-            listingIds: [listing.id],
-          });
-      }
-
-      // 2b) Trendyol: colectează ofertele pentru agregare după loop.
-      const trendyolListings = updated.filter((l) => isTrendyol(l.platform));
-      if (trendyolListings.length > 0) {
-        const stockCode = await this.stockCodes.ensureForProduct(product.id);
-        for (const listing of trendyolListings) {
-          trendyolEntries.push({ listing, product, changed, stockCode });
+        // 2a) eMAG: agregă listing-urile per (plugin, marketplace) — pushEmag împarte 50.
+        for (const listing of updated.filter((l) => isEmag(l.platform))) {
+          const key = `${listing.pluginId}:${listing.platform}`;
+          const existing = emagJobs.get(key);
+          if (existing) existing.listingIds.push(listing.id);
+          else
+            emagJobs.set(key, {
+              pluginId: listing.pluginId,
+              marketplace: listing.platform,
+              listingIds: [listing.id],
+            });
         }
+
+        // 2b) Trendyol: colectează ofertele pentru agregare după loop.
+        const trendyolListings = updated.filter((l) => isTrendyol(l.platform));
+        if (trendyolListings.length > 0) {
+          const stockCode = await this.stockCodes.ensureForProduct(product.id);
+          for (const listing of trendyolListings) {
+            trendyolEntries.push({ listing, product, changed, stockCode });
+          }
+        }
+      } catch (err) {
+        // Un produs ȘTERS între enqueue și procesare (NOT_FOUND) nu trebuie să arunce
+        // TOT job-ul — altfel pg-boss reia inclusiv produsele deja procesate. Orice ALTĂ
+        // eroare (ex. DB tranzitorie) trebuie să iasă mai departe ca pg-boss să reîncerce
+        // job-ul întreg (retryLimit/retryDelay — vezi JobQueueService) — altfel push-ul
+        // pentru acest produs s-ar pierde definitiv, cu doar un warn ca urmă.
+        if (err instanceof DomainError && err.code === 'NOT_FOUND') {
+          this.logger.warn(
+            { productId, err: err.message },
+            'update product content: product not found, skipping (likely deleted)',
+          );
+          continue;
+        }
+        throw err;
       }
     }
 

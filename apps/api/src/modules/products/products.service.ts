@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { schema, DB_TOKEN } from '@opensales/db';
 import { invokeAction } from '@opensales/plugin-sdk';
 import { and, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { Logger } from 'nestjs-pino';
 import { v7 as uuidv7 } from 'uuid';
 
 export interface ProductStats {
@@ -15,13 +16,17 @@ import type { Database } from '@opensales/db';
 
 import { DomainError } from '../../errors/domain.error.js';
 import { JobQueueService } from '../../jobs/job-queue.service.js';
+import { CurrencyService } from '../currency/currency.service.js';
 import {
+  UPDATE_PRICE_JOB,
   UPDATE_PRODUCT_CONTENT_JOB,
   UPDATE_STOCK_JOB,
+  type UpdatePriceJob,
   type UpdateProductContentJob,
   type UpdateStockJob,
 } from '../import/push-jobs.js';
 import { ListingsService } from '../listings/listings.service.js';
+import { marketplaceCurrency } from '../marketplaces/marketplace-catalog.js';
 import { PluginEventsBus } from '../plugins/events/plugin-events.bus.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
@@ -36,6 +41,31 @@ export type ProductWithListings = schema.Product & { listings: ListingInfo[] };
 
 /** Câte produse schimbate procesăm concurent per lot la stockSync. */
 const STOCK_SYNC_BATCH_SIZE = 200;
+
+/**
+ * Fereastră de colapsare pentru save-uri rapide succesive (dublu-click, retry) pe
+ * ACELAȘI produs/listing: pg-boss respinge un al doilea enqueue cu același
+ * singletonKey în aceeași fereastră de N secunde (independent de policy-ul cozii —
+ * vezi job_i4 în pg-boss), iar workerul citește oricum starea curentă la execuție,
+ * deci un singur job ajunge să trimită valoarea FINALĂ.
+ */
+const SAVE_DEDUP_WINDOW_SECONDS = 5;
+
+/** Stringify determinist — sortează cheile obiectelor (nu și ale array-urilor, unde
+ * ordinea contează), ca reordonarea cheilor JSONB de către Postgres să nu producă
+ * fals-pozitive la diff (attributes, images). */
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(val).sort()) {
+        sorted[k] = (val as Record<string, unknown>)[k];
+      }
+      return sorted;
+    }
+    return val;
+  });
+}
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -52,6 +82,8 @@ export class ProductsService {
     private readonly listings: ListingsService,
     private readonly registry: PluginRegistryService,
     private readonly loaded: LoadedPluginsRegistry,
+    private readonly currency: CurrencyService,
+    private readonly logger: Logger,
   ) {}
 
   async list(input: ListProductsDto): Promise<{ data: ProductWithListings[]; total: number }> {
@@ -451,52 +483,76 @@ export class ProductsService {
    * NU enqueue-uiește job-ul de conținut: caller-ul decide (single vs. bulk) ca
    * să poată agrega apelurile marketplace. Întoarce `null` dacă produsul lipsește.
    */
+  /** Câmpuri de preț — au push light dedicat (propagatePriceOnly), nu re-push de conținut. */
+  private static readonly PRICE_FIELDS: ReadonlySet<string> = new Set([
+    'priceAmountMinor',
+    'priceCurrency',
+    'vatRate',
+  ]);
+
+  /** Compară valori: deep (JSON determinist) pentru array/obiect (images, attributes), strict altfel. */
+  private static valueChanged(prior: unknown, next: unknown): boolean {
+    if (prior === next) return false;
+    if (typeof prior === 'object' || typeof next === 'object') {
+      return stableStringify(prior) !== stableStringify(next);
+    }
+    return true;
+  }
+
+  /**
+   * Aplică update-ul în DB și calculează câmpurile REALMENTE schimbate — valoare vs.
+   * valoare, nu doar prezență în body. Formularul de edit retrimite tot obiectul
+   * produsului la fiecare save, deci un diff pe simplă prezență ar declanșa re-push
+   * complet de conținut chiar și când s-a modificat doar stocul sau prețul.
+   */
   private async applyUpdate(
     id: string,
     input: UpdateProductDto,
   ): Promise<{ row: schema.Product; changedFields: string[] } | null> {
-    // Citim stocul curent ÎNAINTE de update ca să propagăm pe marketplace-uri DOAR
-    // dacă stocul chiar s-a schimbat (formularul trimite stockQuantity la fiecare save).
-    let priorStock: number | undefined;
-    if (input.stockQuantity !== undefined) {
-      const cur = await this.db
-        .select({ stock: schema.products.stockQuantity })
-        .from(schema.products)
-        .where(eq(schema.products.id, id))
-        .limit(1);
-      priorStock = cur[0]?.stock;
-    }
+    const [prior] = await this.db
+      .select()
+      .from(schema.products)
+      .where(eq(schema.products.id, id))
+      .limit(1);
+    if (!prior) return null;
 
-    // Build update object with only defined fields to satisfy exactOptionalPropertyTypes
     const updateSet: Record<string, unknown> = { updatedAt: new Date() };
-    if (input.sku !== undefined) updateSet.sku = input.sku;
-    if (input.name !== undefined) updateSet.name = input.name;
-    if (input.description !== undefined) updateSet.description = input.description;
-    if (input.priceAmountMinor !== undefined) updateSet.priceAmountMinor = input.priceAmountMinor;
-    if (input.priceCurrency !== undefined) updateSet.priceCurrency = input.priceCurrency;
+    const changedFields: string[] = [];
+    const consider = <K extends keyof schema.Product>(
+      key: K,
+      value: schema.Product[K] | undefined,
+    ): void => {
+      if (value === undefined) return;
+      updateSet[key] = value;
+      if (ProductsService.valueChanged(prior[key], value)) changedFields.push(key);
+    };
+
+    consider('sku', input.sku);
+    consider('name', input.name);
+    consider('description', input.description);
+    consider('priceAmountMinor', input.priceAmountMinor);
+    consider('priceCurrency', input.priceCurrency);
     if (input.stockQuantity !== undefined) {
-      updateSet.stockQuantity = input.stockQuantity;
+      consider('stockQuantity', input.stockQuantity);
       // Track when stock hits 0; preserve existing timestamp if already 0.
       updateSet.stockZeroSince =
         input.stockQuantity === 0 ? sql`COALESCE(${schema.products.stockZeroSince}, NOW())` : null;
     }
-    if (input.images !== undefined) updateSet.images = input.images;
-    if (input.attributes !== undefined) updateSet.attributes = input.attributes;
-    if (input.isActive !== undefined) updateSet.isActive = input.isActive;
-    if (input.brand !== undefined) updateSet.brand = input.brand;
-    if (input.ean !== undefined) updateSet.ean = input.ean;
-    if (input.vatRate !== undefined) updateSet.vatRate = input.vatRate;
-    if (input.purchasePriceAmountMinor !== undefined)
-      updateSet.purchasePriceAmountMinor = input.purchasePriceAmountMinor;
-    if (input.fullPriceAmountMinor !== undefined)
-      updateSet.fullPriceAmountMinor = input.fullPriceAmountMinor;
-    if (input.weightGrams !== undefined) updateSet.weightGrams = input.weightGrams;
-    if (input.heightMm !== undefined) updateSet.heightMm = input.heightMm;
-    if (input.widthMm !== undefined) updateSet.widthMm = input.widthMm;
-    if (input.lengthMm !== undefined) updateSet.lengthMm = input.lengthMm;
-    if (input.warrantyMonths !== undefined) updateSet.warrantyMonths = input.warrantyMonths;
-    if (input.handlingTimeDays !== undefined) updateSet.handlingTimeDays = input.handlingTimeDays;
-    if (input.numberOfPackages !== undefined) updateSet.numberOfPackages = input.numberOfPackages;
+    consider('images', input.images);
+    consider('attributes', input.attributes);
+    consider('isActive', input.isActive);
+    consider('brand', input.brand);
+    consider('ean', input.ean);
+    consider('vatRate', input.vatRate);
+    consider('purchasePriceAmountMinor', input.purchasePriceAmountMinor);
+    consider('fullPriceAmountMinor', input.fullPriceAmountMinor);
+    consider('weightGrams', input.weightGrams);
+    consider('heightMm', input.heightMm);
+    consider('widthMm', input.widthMm);
+    consider('lengthMm', input.lengthMm);
+    consider('warrantyMonths', input.warrantyMonths);
+    consider('handlingTimeDays', input.handlingTimeDays);
+    consider('numberOfPackages', input.numberOfPackages);
 
     let row: schema.Product | undefined;
     try {
@@ -511,31 +567,94 @@ export class ProductsService {
     }
     if (!row) return null;
 
-    const changedFields = Object.keys(updateSet).filter((k) => k !== 'updatedAt');
     this.events.emitFromPlatform('product.updated', { productId: row.id, changes: changedFields });
     // Stoc schimbat la nivel de produs → propagă pe TOATE ofertele (fără listingId).
-    if (input.stockQuantity !== undefined && input.stockQuantity !== priorStock) {
-      await this.queue.enqueue<UpdateStockJob>(UPDATE_STOCK_JOB, { productId: row.id });
+    // singletonKey: dacă un job anterior pentru acest produs e încă în coadă/activ,
+    // enqueue-ul e no-op — workerul citește stocul curent la execuție, deci un singur
+    // job ajunge să trimită oricum valoarea FINALĂ (safe să colapseze save-uri rapide).
+    if (changedFields.includes('stockQuantity')) {
+      await this.queue.enqueue<UpdateStockJob>(
+        UPDATE_STOCK_JOB,
+        { productId: row.id },
+        { singletonKey: row.id, singletonSeconds: SAVE_DEDUP_WINDOW_SECONDS },
+      );
     }
     return { row, changedFields };
   }
 
-  /** True dacă vreun câmp non-stoc s-a modificat (→ re-push de conținut pe marketplace). */
+  /** True dacă vreun câmp de CONȚINUT (nu stoc, nu preț — au push light dedicat) s-a schimbat. */
   private contentChanged(changedFields: string[]): boolean {
-    return changedFields.some((k) => k !== 'stockQuantity');
+    return changedFields.some((k) => k !== 'stockQuantity' && !ProductsService.PRICE_FIELDS.has(k));
   }
 
   async update(id: string, input: UpdateProductDto): Promise<schema.Product> {
     const result = await this.applyUpdate(id, input);
     if (!result) throw DomainError.notFound(`Product not found: ${id}`);
+    const { row, changedFields } = result;
+
+    // Preț/TVA schimbat → push LIGHT per-ofertă (fără re-validare documentație), NU
+    // re-push complet de conținut — altfel o simplă schimbare de preț ar suprascrie
+    // titlu/poze/descriere pe fiecare ofertă (inclusiv valori setate manual direct pe
+    // marketplace și trase înapoi prin resincronizare).
+    if (changedFields.some((k) => ProductsService.PRICE_FIELDS.has(k))) {
+      await this.propagatePriceOnly(row);
+    }
+
     // Conținut modificat → suprascrie ofertele cu datele produsului și re-push pe
     // eMAG (product_offer/save) + Trendyol (content-bulk / unapproved-bulk).
-    if (this.contentChanged(result.changedFields)) {
+    if (this.contentChanged(changedFields)) {
       await this.queue.enqueue<UpdateProductContentJob>(UPDATE_PRODUCT_CONTENT_JOB, {
-        items: [{ productId: result.row.id, changedFields: result.changedFields }],
+        items: [{ productId: row.id, changedFields }],
       });
     }
-    return result.row;
+    return row;
+  }
+
+  /**
+   * Propagă prețul curent al produsului (convertit în moneda fiecărei piețe) pe
+   * TOATE ofertele lui, ca override per-listing, și enqueue-uiește push-ul light
+   * (UPDATE_PRICE_JOB → PriceUpdateWorker: eMAG offer/save, Trendyol
+   * price-and-inventory, Temu partial.update — niciunul nu re-declanșează validarea
+   * de documentație). Oglindește OfferPriceService.setPriceForProduct, folosit acolo
+   * pentru setarea manuală pe toate ofertele; aici pentru propagarea automată la PATCH.
+   */
+  private async propagatePriceOnly(product: schema.Product): Promise<void> {
+    const listings = await this.listings.listByProduct(product.id);
+    for (const listing of listings) {
+      try {
+        const isTemu = listing.platform.startsWith('temu-');
+        const target = isTemu ? 'RON' : (marketplaceCurrency(listing.platform) ?? 'RON');
+        const converted =
+          target === product.priceCurrency
+            ? product.priceAmountMinor
+            : await this.currency.convertMinor(
+                product.priceAmountMinor,
+                product.priceCurrency,
+                target,
+              );
+        await this.listings.setSyncState(listing.id, {
+          ...listing.syncState,
+          price_amount_minor: String(converted),
+          price_currency: target,
+        });
+        await this.queue.enqueue<UpdatePriceJob>(
+          UPDATE_PRICE_JOB,
+          { listingId: listing.id },
+          { singletonKey: listing.id, singletonSeconds: SAVE_DEDUP_WINDOW_SECONDS },
+        );
+      } catch (err) {
+        // O ofertă cu probleme (ex. ștearsă concurent) nu trebuie să blocheze restul
+        // ofertelor sau enqueue-ul job-ului de conținut pentru alte câmpuri din același request.
+        this.logger.warn(
+          {
+            listingId: listing.id,
+            productId: product.id,
+            err: err instanceof Error ? err.message : String(err),
+          },
+          'propagatePriceOnly: push de preț eșuat pentru o ofertă, continuăm cu celelalte',
+        );
+      }
+    }
   }
 
   /**
@@ -557,8 +676,12 @@ export class ProductsService {
         continue;
       }
       updated++;
-      if (this.contentChanged(result.changedFields)) {
-        contentItems.push({ productId: result.row.id, changedFields: result.changedFields });
+      const { row, changedFields } = result;
+      if (changedFields.some((k) => ProductsService.PRICE_FIELDS.has(k))) {
+        await this.propagatePriceOnly(row);
+      }
+      if (this.contentChanged(changedFields)) {
+        contentItems.push({ productId: row.id, changedFields });
       }
     }
     if (contentItems.length > 0) {

@@ -64,13 +64,6 @@ export const listOrdersSchema = z.object({
   /** Full-text search across externalId, customerName, customerPhone, customerEmail, and item SKU. Internal use (web app). */
   search: z.string().optional(),
   /**
-   * Lookup exact după AWB (de livrare sau de retur) — folosit de app-ul de depozit la
-   * procesarea retururilor, ca să găsească o comandă după AWB-ul scanat fără a descărca
-   * toată lista. Aplică automat și filtru de recență (max 3 luni): un colet neridicat nu
-   * e niciodată mai vechi de atât.
-   */
-  awb: z.string().trim().min(1).optional(),
-  /**
    * Include: returnează doar comenzile cu marketplace-ul în lista dată.
    * Ex: marketplaceInclude=emag-ro  sau  marketplaceInclude=emag-ro,fbe-ro
    */

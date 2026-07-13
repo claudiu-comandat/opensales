@@ -10,7 +10,11 @@ import { PluginEventsBus } from '../plugins/events/plugin-events.bus.js';
 
 import { canTransition, isCancellation, type OrderStatus } from './status-state-machine.js';
 
-import type { OrderFirstItem, OrderSummaryItem } from './dto/order-response.dto.js';
+import type {
+  OrderFirstItem,
+  OrderSummaryItem,
+  ReturnIndexOrder,
+} from './dto/order-response.dto.js';
 import type { StockChangedPayload } from '../events/platform-events.payloads.js';
 import type { CreateOrderDto } from './dto/create-order.dto.js';
 import type { ListOrdersDto } from './dto/list-orders.dto.js';
@@ -62,17 +66,6 @@ export class OrdersService {
     // --- Date range ---
     if (input.placedAfter) filters.push(gte(schema.orders.placedAt, input.placedAfter));
     if (input.placedBefore) filters.push(lte(schema.orders.placedAt, input.placedBefore));
-
-    // --- Lookup după AWB (livrare sau retur) pentru procesarea retururilor din depozit ---
-    // Un colet neridicat/returnat nu e niciodată mai vechi de 3 luni, deci restrângem și pe
-    // recență ca lookup-ul să rămână ieftin. Aceleași câmpuri jsonb ca filtrul hasAwb de mai jos.
-    if (input.awb) {
-      filters.push(
-        sql`(${schema.orders.awbOutgoing}->>'number' = ${input.awb}
-          OR ${schema.orders.awbReturn}->>'number' = ${input.awb})
-          AND ${schema.orders.placedAt} >= now() - interval '3 months'`,
-      );
-    }
 
     // --- Full-text search ---
     if (input.search) {
@@ -217,6 +210,59 @@ export class OrdersService {
       allItemsByOrder,
       hasUnmatchedByOrder,
     };
+  }
+
+  /**
+   * Index SLAB pentru procesarea retururilor din app-ul de depozit: doar comenzile cu AWB
+   * (livrare sau retur) din ultimele 3 luni — un colet neridicat/returnat nu e mai vechi de
+   * atât — cu strictul necesar potrivirii după AWB și storno-ului. App-ul îl încarcă o dată
+   * în cache, apoi caută local la fiecare scanare (fără request per scanare).
+   */
+  async returnIndex(): Promise<ReturnIndexOrder[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.orders)
+      .where(
+        sql`(${schema.orders.awbOutgoing} IS NOT NULL OR ${schema.orders.awbReturn} IS NOT NULL)
+          AND ${schema.orders.placedAt} >= now() - interval '3 months'`,
+      )
+      .orderBy(desc(schema.orders.placedAt));
+    if (rows.length === 0) return [];
+
+    const itemRows = await this.db
+      .select({
+        orderId: schema.orderItems.orderId,
+        sku: schema.orderItems.sku,
+        name: schema.orderItems.name,
+        quantity: schema.orderItems.quantity,
+      })
+      .from(schema.orderItems)
+      .where(
+        inArray(
+          schema.orderItems.orderId,
+          rows.map((r) => r.id),
+        ),
+      );
+
+    const itemsByOrder = new Map<string, OrderSummaryItem[]>();
+    for (const it of itemRows) {
+      // Sar peste liniile sintetice (transport/voucher) — nu sunt produse de returnat.
+      if (it.sku === 'TRANSPORT' || it.sku === 'VOUCHER') continue;
+      const list = itemsByOrder.get(it.orderId) ?? [];
+      list.push({ sku: it.sku, name: it.name, quantity: it.quantity });
+      itemsByOrder.set(it.orderId, list);
+    }
+
+    return rows.map((o) => ({
+      id: o.id,
+      externalId: o.externalId,
+      marketplace: o.marketplace,
+      status: o.status,
+      awbNumber: o.awbOutgoing?.number ?? null,
+      awbReturn: o.awbReturn?.number ? { number: o.awbReturn.number } : null,
+      customer: { name: o.customerName },
+      allItems: itemsByOrder.get(o.id) ?? [],
+    }));
   }
 
   async get(id: string): Promise<{

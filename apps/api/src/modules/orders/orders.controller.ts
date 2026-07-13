@@ -30,7 +30,11 @@ import { zodPipe } from '../products/pipes/zod-validation.pipe.js';
 
 import { CreateOrderDto, createOrderSchema } from './dto/create-order.dto.js';
 import { ListOrdersDto, listOrdersSchema } from './dto/list-orders.dto.js';
-import { toOrderResponse, type OrderResponse } from './dto/order-response.dto.js';
+import {
+  toOrderResponse,
+  type OrderResponse,
+  type ReturnIndexOrder,
+} from './dto/order-response.dto.js';
 import { UpdateOrderStatusDto, updateOrderStatusSchema } from './dto/update-status.dto.js';
 import { EmagAwbIssueService, marketplaceToPlatform } from './emag-awb-issue.service.js';
 import { EmagAwbPdfService } from './emag-awb-pdf.service.js';
@@ -223,6 +227,20 @@ export class OrdersController {
       page: q.page,
       pageSize: 100,
     };
+  }
+
+  // NB: rută statică — trebuie declarată ÎNAINTE de `@Get(':id')`, altfel „return-index"
+  // e capturat ca id.
+  @Get('return-index')
+  @Scopes('orders:read')
+  @ApiOperation({
+    summary:
+      'Index slab de comenzi cu AWB (ultimele 3 luni) pentru cache-ul de retururi din depozit',
+    description:
+      'Întoarce doar câmpurile necesare procesării retururilor (potrivire AWB + storno), fără raw payload/adrese/imagini. App-ul de depozit îl încarcă o dată în cache.',
+  })
+  async returnIndex(): Promise<ReturnIndexOrder[]> {
+    return this.service.returnIndex();
   }
 
   @Get(':id')

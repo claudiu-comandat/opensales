@@ -42,6 +42,22 @@ export interface OrderSummaryItem {
   quantity: number;
 }
 
+/**
+ * Formă SLABĂ pentru cache-ul de retururi din app-ul de depozit: doar câmpurile
+ * necesare potrivirii AWB și afișării/storno-ului. Fără raw payload, adrese, imagini,
+ * prețuri — vezi OrdersService.returnIndex.
+ */
+export interface ReturnIndexOrder {
+  id: string;
+  externalId: string;
+  marketplace: string | null;
+  status: string;
+  awbNumber: string | null;
+  awbReturn: { number: string } | null;
+  customer: { name: string | null };
+  allItems: OrderSummaryItem[];
+}
+
 export interface OrderResponse {
   id: string;
   externalId: string;

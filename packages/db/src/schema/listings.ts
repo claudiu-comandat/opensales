@@ -90,6 +90,8 @@ export interface ListingSyncState {
   /** Barcode-ul specific ofertei pe marketplace (ex. varianta Trendyol). Poate
    * diferi de product.ean când același produs are EAN-uri diferite per canal. */
   barcode?: string | null | undefined;
+  /** Ultima dată (ISO) când s-a apăsat manual „Resincronizează ofertă" (citire live de pe marketplace). */
+  last_manual_resync_at?: string | undefined;
   [key: string]: unknown;
 }
 

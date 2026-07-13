@@ -13,7 +13,11 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 import { PluginRequestLogService } from '../plugin-request-log/plugin-request-log.service.js';
 
 import { DebugService } from './debug.service.js';
-import { PushDebugService, type PushOfferTrace } from './push-debug.service.js';
+import {
+  PushDebugService,
+  type PushOfferTrace,
+  type ResyncOfferResult,
+} from './push-debug.service.js';
 
 import type { DebugInfo } from './debug.service.js';
 import type { RejectedListingsReport } from './rejected-listings.js';
@@ -65,6 +69,20 @@ export class DebugController {
     @Query('dryRun') dryRun?: string,
   ): Promise<PushOfferTrace> {
     return this.pushDebug.tracePushOffer(listingId, { dryRun: dryRun === 'true' });
+  }
+
+  /**
+   * Citește starea CURENTĂ a unei oferte eMAG (titlu/poze/preț/stoc/status) și o
+   * trage înapoi ca override per-ofertă — pentru modificări făcute manual direct
+   * în interfața eMAG (activare/dezactivare, preț, poze) care altfel nu ar ajunge
+   * niciodată în OpenSales.
+   *
+   *   POST /debug/resync-offer/<listingId>
+   */
+  @Post('resync-offer/:listingId')
+  @Roles('admin')
+  async resyncOffer(@Param('listingId') listingId: string): Promise<ResyncOfferResult> {
+    return this.pushDebug.resyncOffer(listingId);
   }
 
   @Get()

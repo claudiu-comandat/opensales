@@ -1839,20 +1839,38 @@ interface PushTraceResult {
   steps?: { step: string; ok: boolean; detail: string }[];
 }
 
+interface ResyncOfferResult {
+  ok: boolean;
+  message: string;
+  changes?: { field: string; before: unknown; after: unknown }[];
+}
+
+function formatChangeValue(v: unknown): string {
+  if (v === undefined || v === null) return '—';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return String(v);
+  return JSON.stringify(v);
+}
+
 export function OfferStatusBanner({
   listingId,
+  channelId,
   mpName,
   status,
   syncState,
 }: {
   listingId: string;
+  channelId: string;
   mpName: string;
   status: string;
   syncState: Record<string, unknown>;
 }): ReactElement {
+  const router = useRouter();
   const [repushStatus, setRepushStatus] = useState<SaveStatus>('idle');
   const [tracing, setTracing] = useState(false);
   const [trace, setTrace] = useState<PushTraceResult | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState<ResyncOfferResult | null>(null);
   const readOnly = syncState.read_only === true;
   const badge = offerStatusBadge(status);
   const lastErrorMsg = readErrorMessage(syncState.last_error);
@@ -1860,6 +1878,7 @@ export function OfferStatusBanner({
   const rejectReasons = readReasonList(syncState.reject_reasons);
   const hasError =
     lastErrorMsg !== undefined || failureReasons.length > 0 || rejectReasons.length > 0;
+  const isEmag = channelId.startsWith('emag-') || channelId.startsWith('fd-');
 
   async function handleRepush(): Promise<void> {
     setRepushStatus('saving');
@@ -1887,6 +1906,30 @@ export function OfferStatusBanner({
       });
     } finally {
       setTracing(false);
+    }
+  }
+
+  // Citește starea LIVE a ofertei de pe eMAG (titlu/poze/preț/stoc/status) și o
+  // trage înapoi ca override per-ofertă — pentru modificări făcute manual direct
+  // în interfața eMAG (ex. dezactivat oferta, schimbat prețul) care altfel nu ar
+  // ajunge niciodată în OpenSales. router.refresh() readuce syncState-ul proaspăt de
+  // pe server; MarketplaceContent e remontat (key legat de last_manual_resync_at) ca
+  // să nu rămână cu titlul/prețul/stocul vechi în state local — altfel un „Salvează"
+  // ulterior ar suprascrie exact valorile pe care resync-ul tocmai le-a adus.
+  async function handleResync(): Promise<void> {
+    setResyncing(true);
+    setResyncResult(null);
+    try {
+      const res = await getApiClient().post<ResyncOfferResult>(`/debug/resync-offer/${listingId}`);
+      setResyncResult(res);
+      if (res.ok) router.refresh();
+    } catch (e) {
+      setResyncResult({
+        ok: false,
+        message: e instanceof Error ? e.message : 'Eroare la resincronizare.',
+      });
+    } finally {
+      setResyncing(false);
     }
   }
 
@@ -1999,6 +2042,28 @@ export function OfferStatusBanner({
         >
           {tracing ? 'Diagnostic…' : 'Diagnostic push'}
         </button>
+        {isEmag && (
+          <button
+            type="button"
+            data-testid="offer-resync-btn"
+            onClick={() => void handleResync()}
+            disabled={resyncing}
+            title="Citește starea curentă de pe eMAG (titlu/poze/preț/stoc/status) și o aplică aici — pentru modificări făcute manual direct în interfața eMAG"
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--ink-300, #d1d5db)',
+              background: 'var(--surface, #fff)',
+              color: 'var(--ink-700, #374151)',
+              padding: '7px 13px',
+              fontSize: 12.5,
+              fontWeight: 600,
+              cursor: resyncing ? 'default' : 'pointer',
+              opacity: resyncing ? 0.7 : 1,
+            }}
+          >
+            {resyncing ? 'Resincronizez…' : 'Resincronizează ofertă'}
+          </button>
+        )}
         {!readOnly && (
           <button
             type="button"
@@ -2234,6 +2299,35 @@ export function OfferStatusBanner({
           )}
         </div>
       )}
+
+      {resyncResult !== null && (
+        <div
+          data-testid="offer-resync-result"
+          style={{
+            borderRadius: 10,
+            border: `1px solid ${resyncResult.ok ? 'var(--ink-200, #e5e7eb)' : 'rgba(239,68,68,0.3)'}`,
+            background: resyncResult.ok ? 'var(--ink-50, #f9fafb)' : 'rgba(239,68,68,0.07)',
+            padding: '10px 12px',
+          }}
+        >
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-900, #0b0d12)' }}>
+            {resyncResult.message}
+          </div>
+          {resyncResult.changes !== undefined && resyncResult.changes.length > 0 && (
+            <ul style={{ margin: '6px 0 0', paddingLeft: 16 }}>
+              {resyncResult.changes.map((c, i) => (
+                <li
+                  key={i}
+                  style={{ fontSize: 11.5, color: 'var(--ink-600, #4b5563)', marginTop: 2 }}
+                >
+                  <strong>{c.field}</strong>: {formatChangeValue(c.before)} →{' '}
+                  {formatChangeValue(c.after)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2352,6 +2446,7 @@ function MarketplaceContent({
       {/* Status + eroare + (re)push per ofertă */}
       <OfferStatusBanner
         listingId={listingId}
+        channelId={channelId}
         mpName={mpName}
         status={status}
         syncState={syncState}
@@ -2968,6 +3063,12 @@ function CreateForm({ form, images, attributes }: PrincipalContentProps): ReactE
 
 export function ProductForm({ mode, initial }: ProductFormProps): ReactElement {
   const router = useRouter();
+  // Return to the list where we came from (page + filters + scroll), not /products page 1.
+  // Fall back to /products when opened directly (no in-app history, e.g. a shared link).
+  const goBack = (): void => {
+    if (window.history.length > 1) router.back();
+    else router.push('/products');
+  };
   const [serverError, setServerError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('principal');
   const [pendingNav, setPendingNav] = useState<string | null>(null);
@@ -3013,7 +3114,7 @@ export function ProductForm({ mode, initial }: ProductFormProps): ReactElement {
       return;
     }
     if (dest === '__back__') {
-      router.push('/products');
+      goBack();
     } else {
       setActiveTab(dest);
     }
@@ -3023,7 +3124,7 @@ export function ProductForm({ mode, initial }: ProductFormProps): ReactElement {
     form.reset();
     const d = pendingNav;
     setPendingNav(null);
-    if (d === '__back__') router.push('/products');
+    if (d === '__back__') goBack();
     else if (d) setActiveTab(d);
   };
 
@@ -3032,7 +3133,7 @@ export function ProductForm({ mode, initial }: ProductFormProps): ReactElement {
     setPendingNav(null);
     await form.handleSubmit(onSubmit)();
     if (!form.formState.errors || Object.keys(form.formState.errors).length === 0) {
-      if (d === '__back__') router.push('/products');
+      if (d === '__back__') goBack();
       else if (d) setActiveTab(d);
     }
   }
@@ -3313,7 +3414,10 @@ export function ProductForm({ mode, initial }: ProductFormProps): ReactElement {
             />
           ) : (
             <MarketplaceContent
-              key={activeTab}
+              // Remontează MarketplaceContent (și OfferStatusBanner) când syncState-ul
+              // e reîmprospătat de un resync reușit (router.refresh() în handleResync),
+              // ca titlul/prețul/stocul local să nu rămână pe valorile dinaintea resync-ului.
+              key={`${activeTab}:${typeof activeChannel?.syncState.last_manual_resync_at === 'string' ? activeChannel.syncState.last_manual_resync_at : ''}`}
               listingId={activeChannel?.listingId ?? ''}
               channelId={activeTab}
               logo={activeChannel?.logo ?? ''}

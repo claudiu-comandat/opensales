@@ -39,7 +39,7 @@ const CORRECTION_COOLDOWN_MS = 4 * 60 * 60 * 1000;
  * Coduri eMAG doc 2.9 — valori care blochează vânzarea = rejected/paused/pending.
  * Prețul invalid (offerValCode=2) suprascrie active→paused.
  */
-function validationStatusToListingStatus(
+export function validationStatusToListingStatus(
   valCode: number,
   offerValCode: number | undefined,
 ): schema.Listing['status'] {
@@ -77,14 +77,31 @@ function validationStatusToListingStatus(
   return status;
 }
 
-interface NormalizedValidationStatus {
+/**
+ * Statusul final al listing-ului: switch-ul manual al vânzătorului pe eMAG
+ * (`offer.status` — 0/2 = oprit de vânzător) câștigă necondiționat, ca reconcile-ul
+ * automat să nu repornească o ofertă pe care vânzătorul a oprit-o manual din
+ * interfața eMAG. Altfel, statusul se derivă din validation_status/offer_validation_status
+ * (validationStatusToListingStatus) — folosită IDENTIC de reconcile-ul automat (2h) și de
+ * resincronizarea manuală (PushDebugService.resyncOffer), ca să nu diverjeze.
+ */
+export function resolveListingStatus(
+  offerStatusRaw: number | undefined,
+  valCode: number,
+  offerValCode: number | undefined,
+): schema.Listing['status'] {
+  if (offerStatusRaw !== undefined && offerStatusRaw !== 1) return 'paused';
+  return validationStatusToListingStatus(valCode, offerValCode);
+}
+
+export interface NormalizedValidationStatus {
   value: number;
   description?: string;
   // Poate fi obiect { errors, warnings, info } (format eMAG) sau array (format vechi).
   errors?: unknown;
 }
 
-function normalizeValidationStatus(raw: unknown): NormalizedValidationStatus | null {
+export function normalizeValidationStatus(raw: unknown): NormalizedValidationStatus | null {
   if (!raw) return null;
   const obj = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
   if (!obj || typeof obj !== 'object') return null;
@@ -104,7 +121,7 @@ function normalizeValidationStatus(raw: unknown): NormalizedValidationStatus | n
 }
 
 /** Normalizează câmpul `errors` care poate fi obiect eMAG sau array legacy. */
-function extractEmagErrors(raw: unknown): {
+export function extractEmagErrors(raw: unknown): {
   errors: unknown[];
   warnings: unknown[];
   info: unknown[];
@@ -123,7 +140,7 @@ function extractEmagErrors(raw: unknown): {
 }
 
 /** Extrage mesajele din array-ul de erori eMAG (preferă ro_RO, fallback en_GB). */
-function extractRejectionReasons(errors: unknown[]): string[] {
+export function extractRejectionReasons(errors: unknown[]): string[] {
   if (!errors || errors.length === 0) return [];
   return errors.flatMap((e) => {
     if (typeof e === 'string') return [e];
@@ -237,7 +254,7 @@ function extractListingImages(rawImages: unknown): string[] {
   });
 }
 
-const syncOffersResultSchema = z.object({
+export const syncOffersResultSchema = z.object({
   items: z.array(z.record(z.unknown())).default([]),
 });
 
@@ -570,7 +587,8 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
 
     if (!valStatus) return { category: null, brand: null, size: null, imageTranslation: null };
 
-    const newStatus = validationStatusToListingStatus(valStatus.value, offerValStatus?.value);
+    const offerStatusRaw = typeof offer.status === 'number' ? offer.status : undefined;
+    const newStatus = resolveListingStatus(offerStatusRaw, valStatus.value, offerValStatus?.value);
     const { errors: errorsArr } = extractEmagErrors(valStatus.errors);
     const reasons = extractRejectionReasons(errorsArr);
 

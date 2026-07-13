@@ -306,7 +306,15 @@ describe('ProductForm (edit mode)', () => {
 
 describe('OfferStatusBanner', () => {
   it('shows the listing status badge', () => {
-    render(<OfferStatusBanner listingId="l1" mpName="eMAG RO" status="error" syncState={{}} />);
+    render(
+      <OfferStatusBanner
+        listingId="l1"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="error"
+        syncState={{}}
+      />,
+    );
     expect(screen.getByTestId('offer-status-badge')).toHaveTextContent(/eroare/i);
   });
 
@@ -314,6 +322,7 @@ describe('OfferStatusBanner', () => {
     render(
       <OfferStatusBanner
         listingId="l1"
+        channelId="emag-ro"
         mpName="eMAG RO"
         status="error"
         syncState={{ last_error: { message: 'eMAG: vat_id invalid', at: '2026-06-10T10:00:00Z' } }}
@@ -326,6 +335,7 @@ describe('OfferStatusBanner', () => {
     render(
       <OfferStatusBanner
         listingId="l1"
+        channelId="trendyol-ro"
         mpName="Trendyol RO"
         status="rejected"
         syncState={{
@@ -340,7 +350,15 @@ describe('OfferStatusBanner', () => {
   });
 
   it('does not render the error box when there is no error', () => {
-    render(<OfferStatusBanner listingId="l1" mpName="eMAG RO" status="active" syncState={{}} />);
+    render(
+      <OfferStatusBanner
+        listingId="l1"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
     expect(screen.queryByTestId('offer-error')).not.toBeInTheDocument();
   });
 
@@ -348,7 +366,13 @@ describe('OfferStatusBanner', () => {
     postMock.mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
     render(
-      <OfferStatusBanner listingId="lst-emag-9" mpName="eMAG RO" status="error" syncState={{}} />,
+      <OfferStatusBanner
+        listingId="lst-emag-9"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="error"
+        syncState={{}}
+      />,
     );
     await user.click(screen.getByTestId('offer-repush-btn'));
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
@@ -359,6 +383,7 @@ describe('OfferStatusBanner', () => {
     render(
       <OfferStatusBanner
         listingId="l1"
+        channelId="trendyol-bg"
         mpName="Trendyol BG"
         status="active"
         syncState={{ read_only: true }}
@@ -383,7 +408,13 @@ describe('OfferStatusBanner', () => {
     });
     const user = userEvent.setup();
     render(
-      <OfferStatusBanner listingId="lst-emag-7" mpName="eMAG RO" status="error" syncState={{}} />,
+      <OfferStatusBanner
+        listingId="lst-emag-7"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="error"
+        syncState={{}}
+      />,
     );
     await user.click(screen.getByTestId('offer-diagnostic-btn'));
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
@@ -401,10 +432,102 @@ describe('OfferStatusBanner', () => {
       error: 'eMAG 401 Unauthorized',
     });
     const user = userEvent.setup();
-    render(<OfferStatusBanner listingId="l1" mpName="eMAG RO" status="error" syncState={{}} />);
+    render(
+      <OfferStatusBanner
+        listingId="l1"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="error"
+        syncState={{}}
+      />,
+    );
     await user.click(screen.getByTestId('offer-diagnostic-btn'));
     const result = await screen.findByTestId('offer-diagnostic-result');
     expect(result).toHaveTextContent(/401 Unauthorized/);
+  });
+
+  it('shows the resync button only for eMAG listings, not Trendyol', () => {
+    const { rerender } = render(
+      <OfferStatusBanner
+        listingId="l1"
+        channelId="trendyol-ro"
+        mpName="Trendyol RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
+    expect(screen.queryByTestId('offer-resync-btn')).not.toBeInTheDocument();
+
+    rerender(
+      <OfferStatusBanner
+        listingId="l1"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
+    expect(screen.getByTestId('offer-resync-btn')).toBeInTheDocument();
+  });
+
+  it('resyncs the offer from eMAG and shows what changed', async () => {
+    postMock.mockResolvedValueOnce({
+      ok: true,
+      message: 'Resincronizat — 2 câmp(uri) actualizate din eMAG.',
+      changes: [
+        { field: 'stock_quantity', before: 5, after: 0 },
+        { field: 'status', before: 'active', after: 'paused' },
+      ],
+    });
+    const user = userEvent.setup();
+    render(
+      <OfferStatusBanner
+        listingId="lst-emag-42"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
+    await user.click(screen.getByTestId('offer-resync-btn'));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock).toHaveBeenCalledWith('/debug/resync-offer/lst-emag-42');
+    const result = await screen.findByTestId('offer-resync-result');
+    expect(result).toHaveTextContent(/2 câmp/);
+    expect(result).toHaveTextContent(/stock_quantity/);
+  });
+
+  it('refreshes the router after a successful resync (so stale local form state does not clobber the pulled eMAG data on a later Save)', async () => {
+    postMock.mockResolvedValueOnce({ ok: true, message: 'Resincronizat.', changes: [] });
+    const user = userEvent.setup();
+    render(
+      <OfferStatusBanner
+        listingId="lst-emag-42"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
+    await user.click(screen.getByTestId('offer-resync-btn'));
+    await waitFor(() => expect(refreshMock).toHaveBeenCalled());
+  });
+
+  it('does NOT refresh the router when the resync fails', async () => {
+    postMock.mockResolvedValueOnce({ ok: false, message: 'Pluginul eMAG nu este activ.' });
+    const user = userEvent.setup();
+    render(
+      <OfferStatusBanner
+        listingId="lst-emag-42"
+        channelId="emag-ro"
+        mpName="eMAG RO"
+        status="active"
+        syncState={{}}
+      />,
+    );
+    await user.click(screen.getByTestId('offer-resync-btn'));
+    await screen.findByTestId('offer-resync-result');
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 });
 
@@ -440,6 +563,50 @@ describe('MarketplaceContent — status + error banner', () => {
     await user.click(tabBtn);
     expect(await screen.findByTestId('offer-error')).toHaveTextContent(/vat_id invalid/);
     expect(screen.getByTestId('offer-repush-btn')).toBeInTheDocument();
+  });
+
+  it("resets the eMAG tab's local title field to the fresh syncState after a resync-triggered refresh (key remount), instead of keeping the stale pre-resync value", async () => {
+    const user = userEvent.setup();
+    const before: ProductFormInitial = {
+      ...sampleInitial,
+      listings: [
+        {
+          id: 'lst-emag-resync',
+          pluginId: 'plugin-emag',
+          pluginPackage: 'emag',
+          platform: 'emag-ro',
+          status: 'active',
+          syncState: { title: 'Titlu vechi (înainte de resync)' },
+        },
+      ],
+    };
+    const { rerender } = render(<ProductForm mode="edit" initial={before} />);
+    const tabBtn = screen.getAllByRole('button').find((b) => /emag/i.test(b.textContent ?? ''));
+    if (!tabBtn) throw new Error('eMAG tab button not found');
+    await user.click(tabBtn);
+    expect(await screen.findByPlaceholderText(/Titlu specific/i)).toHaveValue(
+      'Titlu vechi (înainte de resync)',
+    );
+
+    // Simulează exact ce ar aduce router.refresh() după un resync reușit: aceeași
+    // ofertă, dar syncState proaspăt de pe server (title nou + last_manual_resync_at nou).
+    const after: ProductFormInitial = {
+      ...before,
+      listings: [
+        {
+          ...before.listings![0]!,
+          syncState: {
+            title: 'Titlu nou (din eMAG, după resync)',
+            last_manual_resync_at: '2026-07-13T12:00:00Z',
+          },
+        },
+      ],
+    };
+    rerender(<ProductForm mode="edit" initial={after} />);
+
+    expect(await screen.findByPlaceholderText(/Titlu specific/i)).toHaveValue(
+      'Titlu nou (din eMAG, după resync)',
+    );
   });
 });
 

@@ -54,14 +54,14 @@ export const EmagSyncOffersOutputSchema = z.object({
 export type EmagSyncOffersOutput = z.infer<typeof EmagSyncOffersOutputSchema>;
 
 /**
- * Output of `readVats` action (eMAG nomenclator). Tolerant shape — different
- * eMAG endpoints wrap differently; we accept either a bare array or an
- * `{ items }` envelope.
+ * Output of `readVatRates` action (eMAG nomenclator, `vat/read`). Real shape per
+ * plugins/emag/src/lookups/types.ts (EmagVatRate): `{ id, name?, value }`, where
+ * `value` is a DECIMAL fraction (0.19 for 19%), not a percent integer.
  */
 export const EmagVatRateItemSchema = z
   .object({
-    vat_id: z.number(),
-    vat_rate: z.union([z.number(), z.string()]).transform((v) => Number(v)),
+    id: z.number(),
+    value: z.union([z.number(), z.string()]).transform((v) => Number(v)),
   })
   .passthrough();
 

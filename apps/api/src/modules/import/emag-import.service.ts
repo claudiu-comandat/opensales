@@ -296,29 +296,31 @@ export class EmagImportService implements OnApplicationBootstrap {
   }
 
   /**
-   * Try to read the VAT nomenclator via the plugin's `readVats` action.
-   * If the plugin doesn't expose it (current eMAG plugin only registers
-   * `readCategories`), return an empty lookup — products will be created
-   * with `vatRate = null` and can be enriched later.
+   * Try to read the VAT nomenclator via the plugin's `readVatRates` action
+   * (eMAG `vat/read`, response shaped `{ rates: [...] }`, items shaped
+   * `{ id, value }` with `value` a decimal fraction — 0.19 for 19%). If the
+   * plugin doesn't expose it, return an empty lookup — products will be created
+   * with `vatRate = null` and can be enriched later. Lookup maps id → percent
+   * integer (0, 19, 21…), matching `products.vatRate`.
    */
   private async buildVatLookup(instance: Plugin): Promise<Map<number, number>> {
     const lookup = new Map<number, number>();
-    if (!instance._actions?.readVats) return lookup;
+    if (!instance._actions?.readVatRates) return lookup;
     try {
-      const raw = await invokeAction(instance, 'readVats', {});
+      const raw = await invokeAction(instance, 'readVatRates', {});
       const items = Array.isArray(raw)
         ? raw
-        : Array.isArray((raw as { items?: unknown[] }).items)
-          ? (raw as { items: unknown[] }).items
+        : Array.isArray((raw as { rates?: unknown[] }).rates)
+          ? (raw as { rates: unknown[] }).rates
           : [];
       for (const it of items) {
         const parsed = EmagVatRateItemSchema.safeParse(it);
-        if (parsed.success) lookup.set(parsed.data.vat_id, Math.round(parsed.data.vat_rate));
+        if (parsed.success) lookup.set(parsed.data.id, Math.round(parsed.data.value * 100));
       }
     } catch (err) {
       this.logger.warn(
         { err: err instanceof Error ? err.message : String(err) },
-        'readVats failed — proceeding without VAT lookup',
+        'readVatRates failed — proceeding without VAT lookup',
       );
     }
     return lookup;

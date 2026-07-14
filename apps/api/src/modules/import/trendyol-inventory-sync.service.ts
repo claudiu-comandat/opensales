@@ -6,6 +6,9 @@ import { ListingsService } from '../listings/listings.service.js';
 import { trendyolStorefrontFor } from '../marketplaces/marketplace-catalog.js';
 import { MarketplaceEnablementService } from '../marketplaces/marketplace-enablement.service.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
+import { WorkspaceService } from '../workspace/workspace.service.js';
+
+import { effectiveVatRate } from './push-offer.mapper.js';
 
 import type { ListingInfo } from '../products/dto/product-response.dto.js';
 import type { ProductWithListings } from '../products/products.service.js';
@@ -32,6 +35,7 @@ export class TrendyolInventorySyncService {
     private readonly enablement: MarketplaceEnablementService,
     private readonly loaded: LoadedPluginsRegistry,
     private readonly listings: ListingsService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -73,10 +77,11 @@ export class TrendyolInventorySyncService {
     const trendyol = product.listings.filter((l) => l.platform.startsWith('trendyol-'));
     if (trendyol.length === 0) return;
 
+    const { vatPayer } = await this.workspace.get();
     const ro = trendyol.find((l) => l.platform === TRENDYOL_RO);
     if ((await this.eccOn()) && ro) {
       // Push doar pe RO; oglindim local restul țărilor.
-      await this.pushItem(ro, product, opts);
+      await this.pushItem(ro, product, opts, vatPayer);
       const roStock = this.stockOf(ro, product);
       const roPriceMinor = String(this.priceMinorOf(ro, product));
       const roCurrency =
@@ -97,7 +102,7 @@ export class TrendyolInventorySyncService {
     // ECC off (sau fără ofertă RO): trimite independent oferta țintă (sau toate).
     const targets =
       changedListingId !== undefined ? trendyol.filter((l) => l.id === changedListingId) : trendyol;
-    for (const listing of targets) await this.pushItem(listing, product, opts);
+    for (const listing of targets) await this.pushItem(listing, product, opts, vatPayer);
   }
 
   async syncStockMany(products: ProductWithListings[]): Promise<void> {
@@ -111,6 +116,7 @@ export class TrendyolInventorySyncService {
     if (products.length === 0) return;
 
     const isEcc = await this.eccOn();
+    const { vatPayer } = await this.workspace.get();
 
     interface BatchEntry {
       pluginId: string;
@@ -133,12 +139,12 @@ export class TrendyolInventorySyncService {
 
         const existing = batches.get(ro.pluginId);
         if (existing) {
-          existing.items.push(this.buildItem(ro, product, opts));
+          existing.items.push(this.buildItem(ro, product, opts, vatPayer));
         } else {
           batches.set(ro.pluginId, {
             pluginId: ro.pluginId,
             storeFrontCode: trendyolStorefrontFor(TRENDYOL_RO),
-            items: [this.buildItem(ro, product, opts)],
+            items: [this.buildItem(ro, product, opts, vatPayer)],
           });
         }
 
@@ -165,12 +171,12 @@ export class TrendyolInventorySyncService {
           const key = `${listing.pluginId}::${listing.platform}`;
           const existing = batches.get(key);
           if (existing) {
-            existing.items.push(this.buildItem(listing, product, opts));
+            existing.items.push(this.buildItem(listing, product, opts, vatPayer));
           } else {
             batches.set(key, {
               pluginId: listing.pluginId,
               storeFrontCode: trendyolStorefrontFor(listing.platform),
-              items: [this.buildItem(listing, product, opts)],
+              items: [this.buildItem(listing, product, opts, vatPayer)],
             });
           }
         }
@@ -194,6 +200,7 @@ export class TrendyolInventorySyncService {
     listing: ListingInfo,
     product: ProductWithListings,
     opts: { stock?: boolean; price?: boolean },
+    vatPayer: boolean,
   ): Promise<void> {
     const resolution = await this.enablement.resolve(listing.platform);
     if (!resolution.ok) {
@@ -208,7 +215,7 @@ export class TrendyolInventorySyncService {
 
     const storeFrontCode = trendyolStorefrontFor(listing.platform);
     await invokeAction(loaded.instance, 'updateStockAndPrice', {
-      items: [this.buildItem(listing, product, opts)],
+      items: [this.buildItem(listing, product, opts, vatPayer)],
       ...(storeFrontCode ? { storeFrontCode } : {}),
     });
   }
@@ -217,6 +224,7 @@ export class TrendyolInventorySyncService {
     listing: ListingInfo,
     product: ProductWithListings,
     opts: { stock?: boolean; price?: boolean },
+    vatPayer: boolean,
   ): Record<string, unknown> {
     // barcode + DOAR câmpul modificat (nu zero-uim celălalt câmp). vatRate se
     // trimite NUMAI la update de preț (la stoc nu e cerut).
@@ -230,7 +238,7 @@ export class TrendyolInventorySyncService {
         product.fullPriceAmountMinor !== null ? majorFromMinor(product.fullPriceAmountMinor) : sale;
       item.salePrice = sale;
       item.listPrice = list;
-      item.vatRate = product.vatRate ?? 0;
+      item.vatRate = effectiveVatRate({ product, vatPayer }) ?? 0;
     }
     return item;
   }

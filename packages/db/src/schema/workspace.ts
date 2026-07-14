@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * Singleton workspace row — one per installation.
@@ -16,6 +16,8 @@ export const workspace = pgTable('workspace', {
   /** Stradă — folosită ca sender.street pe AWB-uri. */
   street: text('street'),
   vatId: text('vat_id'),
+  /** Plătitor de TVA. Neplătitor (default) → forțează TVA 0% la trimiterea ofertelor pe marketplace-uri, indiferent de `products.vatRate`. */
+  vatPayer: boolean('vat_payer').notNull().default(false),
   registrationNumber: text('registration_number'),
   country: text('country').notNull().default('România'),
   county: text('county'),

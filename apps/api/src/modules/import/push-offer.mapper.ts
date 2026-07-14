@@ -8,6 +8,11 @@ export interface OfferPushContext {
   stockCode: number;
   /** Cheia platformei eMAG (emag-ro/bg/hu, fd-ro/bg). Necesară pentru vat_id corect. */
   platform?: string;
+  /**
+   * Plătitor de TVA (din `workspace.vatPayer`). Neplătitor (false, default) → forțează
+   * TVA 0% la push indiferent de `product.vatRate` — vezi `effectiveVatRate`.
+   */
+  vatPayer?: boolean;
   /** Default-uri compliance Temu din config-ul plugin-ului (override-ite de syncState.temu). */
   temuCompliance?: TemuComplianceConfig;
   /**
@@ -45,6 +50,18 @@ export const TEMU_TAX_CODE_BY_RATE: Record<number, string> = {
 
 function rateKey(vatRate: number | null | undefined): number | undefined {
   return typeof vatRate === 'number' ? vatRate : undefined;
+}
+
+/**
+ * TVA-ul efectiv trimis la marketplace: dacă workspace-ul e neplătitor de TVA
+ * (`ctx.vatPayer` false/absent — default), forțează 0% indiferent de `product.vatRate`.
+ * Plătitor → folosește rata per-produs ca până acum. Singurul punct din care se
+ * citește TVA-ul de trimis; toate mapările (eMAG/Trendyol/Temu) trec prin el.
+ */
+export function effectiveVatRate(
+  ctx: Pick<OfferPushContext, 'product' | 'vatPayer'>,
+): number | null {
+  return ctx.vatPayer ? ctx.product.vatRate : 0;
 }
 
 export function emagVatIdForRate(
@@ -112,7 +129,8 @@ function asciiGoodsName(name: string): string {
 
 /**
  * eMAG product_offer/save. `id` = stock code partajat; `part_number` = SKU-ul nostru.
- * `vat_id` se rezolvă din `product.vatRate` și `ctx.platform` (0% → 5/1002/1004 per țară). `min_sale_price`=1, `max`=2×sale.
+ * `vat_id` se rezolvă din `effectiveVatRate(ctx)` (product.vatRate, sau 0 forțat dacă workspace-ul
+ * e neplătitor de TVA) și `ctx.platform` (0% → 5/1002/1004 per țară). `min_sale_price`=1, `max`=2×sale.
  * Doc v4.5: obligatorii id, category_id, name, part_number, brand, status,
  * sale_price, min_sale_price, max_sale_price, stock, vat_id.
  */
@@ -142,7 +160,7 @@ export function toEmagOfferPayload(ctx: OfferPushContext): Record<string, unknow
     sale_price: sale,
     min_sale_price: 1,
     max_sale_price: Math.round(sale * 2 * 100) / 100,
-    vat_id: emagVatIdForRate(ctx.platform, product.vatRate),
+    vat_id: emagVatIdForRate(ctx.platform, effectiveVatRate(ctx)),
     status: 1,
     ...(product.ean ? { ean: [product.ean] } : {}),
     ...(warranty !== undefined ? { warranty } : {}),
@@ -181,9 +199,10 @@ export function emagPayloadIssues(ctx: OfferPushContext): PayloadIssues {
   if (!(syncState.title ?? product.name)) missingRequired.push('name');
   if (!product.sku) missingRequired.push('part_number');
   if (!(syncState.brand ?? product.brand)) missingRequired.push('brand');
-  if (emagVatIdForRate(ctx.platform, product.vatRate) === undefined)
+  const vatRate = effectiveVatRate(ctx);
+  if (emagVatIdForRate(ctx.platform, vatRate) === undefined)
     missingRequired.push(
-      `vat_id (vatRate=${product.vatRate ?? 'n/a'} nemapat pe ${ctx.platform ?? 'platformă necunoscută'})`,
+      `vat_id (vatRate=${vatRate ?? 'n/a'} nemapat pe ${ctx.platform ?? 'platformă necunoscută'})`,
     );
   const sale = majorFromMinor(syncState.price_amount_minor ?? product.priceAmountMinor);
   if (!(sale > 0)) missingRequired.push('sale_price');
@@ -246,7 +265,7 @@ export function toTrendyolItem(ctx: OfferPushContext): Record<string, unknown> {
     categoryId: numericOr(syncState.category),
     listPrice: list,
     salePrice: sale,
-    vatRate: product.vatRate ?? 0,
+    vatRate: effectiveVatRate(ctx) ?? 0,
     quantity: toNumber(syncState.stock_quantity) ?? product.stockQuantity,
     dimensionalWeight: 1,
     images: images(syncState, product),
@@ -429,7 +448,7 @@ export function toTemuGoodsPayload(
   // fallback la URL-urile din syncState pentru preview (dry-run, fără upload).
   const imgs = imageUrls ?? (syncState.images ?? []).map((i) => i.url);
   const description = syncState.description ?? product.description ?? undefined;
-  const taxCode = temuTaxCodeForRate(product.vatRate);
+  const taxCode = temuTaxCodeForRate(effectiveVatRate(ctx));
 
   const packageInfo: Record<string, unknown> = {
     weight: product.weightGrams !== null ? String(product.weightGrams) : '',
@@ -512,8 +531,9 @@ export function temuPayloadIssues(ctx: OfferPushContext): PayloadIssues {
 
   if (!(syncState.title ?? product.name)) missingRequired.push('goodsBasic.goodsName');
   if (!isFiniteNumber(numericOr(syncState.category))) missingRequired.push('goodsBasic.catId');
-  if (temuTaxCodeForRate(product.vatRate) === undefined)
-    missingRequired.push(`goodsBasic.itemTaxCode (vatRate=${product.vatRate ?? 'n/a'} nemapat)`);
+  const temuVatRate = effectiveVatRate(ctx);
+  if (temuTaxCodeForRate(temuVatRate) === undefined)
+    missingRequired.push(`goodsBasic.itemTaxCode (vatRate=${temuVatRate ?? 'n/a'} nemapat)`);
   if (!extra?.goodsServicePromise?.costTemplateId)
     missingRequired.push('goodsServicePromise.costTemplateId');
 

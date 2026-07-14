@@ -8,8 +8,9 @@ import { ListingsService } from '../../listings/listings.service.js';
 import { LoadedPluginsRegistry } from '../../plugins/loader/loaded-plugins.registry.js';
 import { ProductsService, type ProductWithListings } from '../../products/products.service.js';
 import { StockCodeService } from '../../products/stock-code.service.js';
+import { WorkspaceService } from '../../workspace/workspace.service.js';
 import { EMAG_ASSOCIATE_JOB, type EmagAssociateJob } from '../push-jobs.js';
-import { emagVatIdForRate } from '../push-offer.mapper.js';
+import { effectiveVatRate, emagVatIdForRate } from '../push-offer.mapper.js';
 
 /** Câmpurile pe care le întoarce find_by_eans pentru un produs existent în catalog. */
 interface FindByEanMatch {
@@ -51,6 +52,7 @@ export class EmagAssociateWorker implements OnApplicationBootstrap {
     private readonly products: ProductsService,
     private readonly listings: ListingsService,
     private readonly stockCodes: StockCodeService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -95,7 +97,8 @@ export class EmagAssociateWorker implements OnApplicationBootstrap {
         : product.name;
     const stockCode = await this.stockCodes.ensureForProduct(product.id);
     const sale = Number(listing.syncState.price_amount_minor ?? product.priceAmountMinor) / 100;
-    const vatId = emagVatIdForRate(platform, product.vatRate);
+    const { vatPayer } = await this.workspace.get();
+    const vatId = emagVatIdForRate(platform, effectiveVatRate({ product, vatPayer }));
     const stockVal =
       typeof listing.syncState.stock_quantity === 'number'
         ? listing.syncState.stock_quantity

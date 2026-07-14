@@ -225,6 +225,13 @@
       "when": 1782600000000,
       "tag": "0030_order_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782700000000,
+      "tag": "0031_workspace_vat_payer",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { type LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.reg
 import { type PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 import { type ProductsService } from '../products/products.service.js';
 import { type StockCodeService } from '../products/stock-code.service.js';
+import { type WorkspaceService } from '../workspace/workspace.service.js';
 
 import { PushDebugService } from './push-debug.service.js';
 
@@ -72,8 +73,11 @@ function makeService(opts: {
   const stockCodes = {
     ensureForProduct: vi.fn(() => Promise.resolve(42)),
   } as unknown as StockCodeService;
+  const workspace = {
+    get: vi.fn(() => Promise.resolve({ vatPayer: false })),
+  } as unknown as WorkspaceService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Logger;
-  return new PushDebugService(registry, loaded, products, listings, stockCodes, logger);
+  return new PushDebugService(registry, loaded, products, listings, stockCodes, workspace, logger);
 }
 
 describe('PushDebugService.tracePushOffer', () => {

@@ -109,6 +109,7 @@ export interface WorkspaceData {
   email?: string | null;
   street?: string | null;
   vatId?: string | null;
+  vatPayer?: boolean | null;
   registrationNumber?: string | null;
   country?: string | null;
   county?: string | null;
@@ -133,6 +134,7 @@ export function SettingsView({
   const [country, setCountry] = useState(workspace?.country ?? 'România');
   const [county, setCounty] = useState(workspace?.county ?? 'Ilfov');
   const [street, setStreet] = useState(workspace?.street ?? '');
+  const [vatPayer, setVatPayer] = useState(workspace?.vatPayer ?? false);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -170,6 +172,7 @@ export function SettingsView({
         country,
         county: country === 'România' ? county : null,
         street: street || null,
+        vatPayer,
       });
       setSaveSuccess(true);
     } catch {
@@ -393,6 +396,22 @@ export function SettingsView({
                   value={street}
                   onChange={(e): void => setStreet(e.target.value)}
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <FieldLabel>TVA</FieldLabel>
+                <select
+                  className={inputCls}
+                  value={vatPayer ? 'payer' : 'nonpayer'}
+                  onChange={(e): void => setVatPayer(e.target.value === 'payer')}
+                >
+                  <option value="nonpayer">Neplătitor de TVA</option>
+                  <option value="payer">Plătitor de TVA</option>
+                </select>
+                <div className="mt-1.5 px-1 text-[11px] text-ink-500">
+                  Neplătitor: la trimiterea ofertelor pe eMAG/Trendyol/orice marketplace se forțează
+                  mereu TVA 0%, indiferent de TVA-ul setat pe produs.
+                </div>
               </div>
             </div>
 

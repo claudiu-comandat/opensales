@@ -12,6 +12,7 @@ const WORKSPACE_DEFAULTS = {
   email: null as string | null,
   street: null as string | null,
   vatId: null as string | null,
+  vatPayer: false,
   registrationNumber: null as string | null,
   country: 'România',
   county: null as string | null,

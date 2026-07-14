@@ -15,6 +15,7 @@ const updateWorkspaceSchema = z.object({
   email: z.string().email().nullable().optional(),
   street: z.string().nullable().optional(),
   vatId: z.string().nullable().optional(),
+  vatPayer: z.boolean().optional(),
   registrationNumber: z.string().nullable().optional(),
   country: z.string().optional(),
   county: z.string().nullable().optional(),

@@ -40,7 +40,7 @@ import { EmagAwbIssueService, marketplaceToPlatform } from './emag-awb-issue.ser
 import { EmagAwbPdfService } from './emag-awb-pdf.service.js';
 import { EmagOrderActionsService } from './emag-order-actions.service.js';
 import { EmagOrderSyncService } from './emag-order-sync.service.js';
-import { OrderReturnsService } from './order-returns.service.js';
+import { OrderReturnsService, serializeOrderReturn } from './order-returns.service.js';
 import { OrdersService } from './orders.service.js';
 import { TemuAwbService } from './temu-awb.service.js';
 import { TemuOrderSyncService } from './temu-order-sync.service.js';
@@ -380,7 +380,7 @@ export class OrdersController {
   @Roles('admin', 'operator')
   @Scopes('orders:read')
   async listReturns(@Param('id') id: string) {
-    return this.orderReturns.listReturns(id);
+    return (await this.orderReturns.listReturns(id)).map(serializeOrderReturn);
   }
 
   @Post(':id/return')
@@ -417,7 +417,7 @@ export class OrdersController {
       feeCurrency: input.feeCurrency,
       comment: input.comment,
     });
-    return { ok: true, orderReturn };
+    return { ok: true, orderReturn: serializeOrderReturn(orderReturn) };
   }
 
   @Post(':id/emag-cancel')

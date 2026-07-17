@@ -54,6 +54,15 @@ function aggregateByItem(items: ProcessPartialReturnItem[]): ProcessPartialRetur
   return Array.from(byItem, ([orderItemId, quantity]) => ({ orderItemId, quantity }));
 }
 
+export interface SerializedOrderReturn extends Omit<schema.OrderReturn, 'feeAmountMinor'> {
+  feeAmountMinor: string | null;
+}
+
+/** `feeAmountMinor` e `bigint` în DB — Express/JSON.stringify nu știe să-l serializeze la granița API. */
+export function serializeOrderReturn(r: schema.OrderReturn): SerializedOrderReturn {
+  return { ...r, feeAmountMinor: r.feeAmountMinor === null ? null : r.feeAmountMinor.toString() };
+}
+
 @Injectable()
 export class OrderReturnsService {
   /**

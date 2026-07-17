@@ -304,7 +304,16 @@ export function buildInvoiceActions(
       const client = await clientProvider();
       const cfg = emitConfigProvider();
       const effectiveSerie = order.marketplaceInvoiceSeries ?? cfg.defaultSerie;
-      const orderForReissue: OrderWithItems = { ...order, items: input.items };
+      // Apelantul controlează integral discountul (preț per-item, deja redus) și transportul
+      // (item TRANSPORT explicit, doar pe retur parțial) — anulăm câmpurile de pe comandă ca
+      // buildFgoEmitInput să NU adauge liniile sintetice Voucher/Transport peste itemii primiți
+      // (ar dubla discountul, respectiv ar refactura transportul pe returul total cu taxă).
+      const orderForReissue: OrderWithItems = {
+        ...order,
+        items: input.items,
+        vouchersMinor: undefined,
+        shippingCostMinor: undefined,
+      };
       const fgoInput = buildFgoEmitInput(orderForReissue, {
         ...cfg,
         defaultSerie: effectiveSerie ?? undefined,

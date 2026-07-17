@@ -354,13 +354,25 @@ export class EmagOrderSyncService implements OnApplicationBootstrap {
     return windows;
   }
 
-  /** `YYYY-MM-DD HH:ii:ss` (UTC) — formatul cerut de eMAG pentru createdAfter/createdBefore. */
+  /**
+   * `YYYY-MM-DD HH:ii:ss` (Europe/Bucharest, ora locală) — formatul cerut de eMAG
+   * pentru createdAfter/createdBefore. eMAG interpretează aceste string-uri ca oră
+   * locală România (EET/EEST), nu UTC — folosim Intl pentru conversie corectă cu DST.
+   */
   private toEmagDateTime(d: Date): string {
-    const pad = (n: number): string => String(n).padStart(2, '0');
-    return (
-      `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
-      `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
-    );
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Bucharest',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+    const hour = get('hour') === '24' ? '00' : get('hour');
+    return `${get('year')}-${get('month')}-${get('day')} ${hour}:${get('minute')}:${get('second')}`;
   }
 
   private async upsertOrder(

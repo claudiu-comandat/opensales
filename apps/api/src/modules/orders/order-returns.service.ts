@@ -137,7 +137,12 @@ export class OrderReturnsService {
           sourceReference: options.sourceReference ?? null,
           feeAmountMinor:
             options.feeAmountMinor !== undefined ? BigInt(options.feeAmountMinor) : null,
-          feeCurrency: options.feeCurrency ?? null,
+          // FGO e mono-monedă/factură — o taxă fără monedă explicită moștenește moneda comenzii
+          // (validată mai sus ca identică, dacă e dată explicit).
+          feeCurrency:
+            options.feeAmountMinor !== undefined
+              ? (options.feeCurrency ?? order.totalCurrency)
+              : null,
           comment: options.comment ?? null,
         })
         .onConflictDoNothing({

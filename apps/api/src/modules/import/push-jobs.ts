@@ -75,6 +75,23 @@ export interface EmagReconcileJob {
   pluginId: string;
 }
 
+export const PRELIST_VALIDATED_WEBHOOK_JOB = 'plugin.prelist_validated_webhook';
+
+/**
+ * Notifică webhook-ul extern de prelistare (workspace.prelistValidatedWebhookUrl) cu toate
+ * produsele validate de eMAG într-un ciclu de reconciliere, într-un singur POST batched.
+ * pg-boss reîncearcă automat la eșec (retryLimit/retryDelay/retryBackoff — vezi JobQueueService).
+ */
+export interface PrelistValidatedWebhookJob {
+  url: string;
+  products: {
+    sku: string;
+    platform: string;
+    category_id: number | string | undefined;
+    characteristics: unknown;
+  }[];
+}
+
 export const EMAG_ASSOCIATE_JOB = 'plugin.emag_associate';
 
 /**

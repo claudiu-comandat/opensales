@@ -13,8 +13,10 @@ import { ProductsService } from '../../products/products.service.js';
 import { WorkspaceService } from '../../workspace/workspace.service.js';
 import {
   EMAG_RECONCILE_JOB,
+  PRELIST_VALIDATED_WEBHOOK_JOB,
   PUSH_OFFERS_JOB,
   type EmagReconcileJob,
+  type PrelistValidatedWebhookJob,
   type PushOffersJob,
 } from '../push-jobs.js';
 
@@ -319,6 +321,11 @@ interface PendingImageCheck {
   listing: schema.Listing;
 }
 
+interface PrelistValidatedCandidate {
+  listing: schema.Listing;
+  currentSyncState: schema.ListingSyncState;
+}
+
 /**
  * Decide dacă un listing trebuie inclus în pool-ul de reconciliere:
  * - Nu a fost niciodată sincronizat (no validation_status).
@@ -376,6 +383,9 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
     if (process.env.NODE_ENV === 'test') return;
 
     await this.queue.register<EmagReconcileJob>(EMAG_RECONCILE_JOB, (data) => this.reconcile(data));
+    await this.queue.register<PrelistValidatedWebhookJob>(PRELIST_VALIDATED_WEBHOOK_JOB, (data) =>
+      this.sendPrelistWebhook(data),
+    );
 
     const plugin = await this.registry.findByPackageName(EMAG_PACKAGE);
     if (!plugin) {
@@ -432,6 +442,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
       const sizeCandidates: SizeCorrectionCandidate[] = [];
       const imageTranslationCandidates: ImageTranslationCandidate[] = [];
       const pendingImageChecks: PendingImageCheck[] = [];
+      const prelistValidatedCandidates: PrelistValidatedCandidate[] = [];
 
       for (const [platform, platformListings] of byPlatform) {
         try {
@@ -441,12 +452,14 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
             sizeCandidates: scs,
             imageTranslationCandidates: itcs,
             pendingImageChecks: pics,
+            prelistValidatedCandidates: pvcs,
           } = await this.reconcilePlatform(instance, platform, platformListings);
           correctionCandidates.push(...categoryCandidates);
           brandCandidates.push(...bcs);
           sizeCandidates.push(...scs);
           imageTranslationCandidates.push(...itcs);
           pendingImageChecks.push(...pics);
+          prelistValidatedCandidates.push(...pvcs);
         } catch (err) {
           this.logger.warn({ platform, err: errMsg(err) }, 'eMAG reconcile: platform sync failed');
         }
@@ -457,6 +470,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
       await this.applySizeCorrections(sizeCandidates, allListings);
       await this.applyImageTranslations(imageTranslationCandidates);
       await this.checkPendingImageTranslations(pendingImageChecks);
+      await this.notifyPrelistValidated(prelistValidatedCandidates);
     } finally {
       this.running = false;
     }
@@ -472,6 +486,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
     sizeCandidates: SizeCorrectionCandidate[];
     imageTranslationCandidates: ImageTranslationCandidate[];
     pendingImageChecks: PendingImageCheck[];
+    prelistValidatedCandidates: PrelistValidatedCandidate[];
   }> {
     // Scanăm TOATE listing-urile pentru traduceri pending (indiferent de stare eMAG)
     const pendingImageChecks: PendingImageCheck[] = listings
@@ -492,6 +507,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
         sizeCandidates: [],
         imageTranslationCandidates: [],
         pendingImageChecks,
+        prelistValidatedCandidates: [],
       };
     }
 
@@ -501,6 +517,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
     const brandCandidates: BrandCorrectionCandidate[] = [];
     const sizeCandidates: SizeCorrectionCandidate[] = [];
     const imageTranslationCandidates: ImageTranslationCandidate[] = [];
+    const prelistValidatedCandidates: PrelistValidatedCandidate[] = [];
 
     // O singură baleiere paginată a catalogului (100/pagină, ca la import) în loc de
     // un product_offer/read separat per listing — evită mii de requesturi/ciclu.
@@ -527,6 +544,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
       if (result.brand) brandCandidates.push(result.brand);
       if (result.size) sizeCandidates.push(result.size);
       if (result.imageTranslation) imageTranslationCandidates.push(result.imageTranslation);
+      if (result.prelistValidated) prelistValidatedCandidates.push(result.prelistValidated);
       updated++;
     }
 
@@ -541,6 +559,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
       sizeCandidates,
       imageTranslationCandidates,
       pendingImageChecks,
+      prelistValidatedCandidates,
     };
   }
 
@@ -581,11 +600,19 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
     brand: BrandCorrectionCandidate | null;
     size: SizeCorrectionCandidate | null;
     imageTranslation: ImageTranslationCandidate | null;
+    prelistValidated: PrelistValidatedCandidate | null;
   }> {
+    const emptyResult = {
+      category: null,
+      brand: null,
+      size: null,
+      imageTranslation: null,
+      prelistValidated: null,
+    };
     const valStatus = normalizeValidationStatus(offer.validation_status);
     const offerValStatus = normalizeValidationStatus(offer.offer_validation_status);
 
-    if (!valStatus) return { category: null, brand: null, size: null, imageTranslation: null };
+    if (!valStatus) return emptyResult;
 
     const offerStatusRaw = typeof offer.status === 'number' ? offer.status : undefined;
     const newStatus = resolveListingStatus(offerStatusRaw, valStatus.value, offerValStatus?.value);
@@ -602,7 +629,7 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
       prev?.description === valStatus.description;
     const needsErrorUpdate = newStatus === 'rejected';
     if (nothingChanged && !needsErrorUpdate) {
-      return { category: null, brand: null, size: null, imageTranslation: null };
+      return emptyResult;
     }
 
     const nextSyncState: schema.ListingSyncState = {
@@ -658,71 +685,83 @@ export class EmagReconcileWorker implements OnApplicationBootstrap {
 
     await this.listings.applyPushResult(listing.id, newStatus, nextSyncState);
 
-    if (prelistValidated) await this.notifyPrelistValidated(listing, nextSyncState);
-
-    return { category, brand, size, imageTranslation };
+    return {
+      category,
+      brand,
+      size,
+      imageTranslation,
+      prelistValidated: prelistValidated ? { listing, currentSyncState: nextSyncState } : null,
+    };
   }
 
   /**
-   * Best-effort: anunță procesul extern de completare (LLM + validare manuală)
-   * că un produs prelistat a fost validat de eMAG, cu datele atribuite.
+   * Anunță procesul extern de completare (LLM + validare manuală) cu TOATE produsele
+   * prelistate validate de eMAG în acest ciclu de reconciliere, într-un singur POST batched.
    * URL-ul se configurează în platformă (Setări → API & Webhook →
-   * workspace.prelistValidatedWebhookUrl). Necompletat = fără notificare —
-   * datele rămân interogabile prin GET /listings.
+   * workspace.prelistValidatedWebhookUrl). Necompletat = fără notificare — datele rămân
+   * interogabile prin GET /listings.
+   *
+   * SKU-ul e garantat: produsul e creat în aceeași operație de prelistare care creează
+   * listing-ul (POST /import/products/prelist), deci un produs lipsă la acest punct e o
+   * inconsistență reală, nu un caz normal — candidatul respectiv e exclus din batch și logat.
+   *
+   * Trimiterea efectivă rulează ca job (PRELIST_VALIDATED_WEBHOOK_JOB) — la eșec, pg-boss
+   * reîncearcă automat (retryLimit/retryDelay/retryBackoff, vezi JobQueueService).
    */
-  private async notifyPrelistValidated(
-    listing: schema.Listing,
-    syncState: schema.ListingSyncState,
-  ): Promise<void> {
+  private async notifyPrelistValidated(candidates: PrelistValidatedCandidate[]): Promise<void> {
+    if (candidates.length === 0) return;
+
     let url: string | null;
     try {
       url = (await this.workspace.get()).prelistValidatedWebhookUrl;
     } catch (err) {
       this.logger.warn(
-        { listingId: listing.id, err: errMsg(err) },
+        { err: errMsg(err) },
         'prelist validated: could not read workspace settings',
       );
       return;
     }
     if (!url) return;
 
-    let sku: string | undefined;
-    try {
-      sku = (await this.products.get(listing.productId)).sku;
-    } catch (err) {
-      this.logger.warn(
-        { listingId: listing.id, productId: listing.productId, err: errMsg(err) },
-        'prelist validated: product not found for webhook payload',
-      );
-    }
+    const products = await this.products.getMany(candidates.map((c) => c.listing.productId));
+    const skuByProductId = new Map(products.map((p) => [p.id, p.sku]));
 
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sku,
-          listingId: listing.id,
-          platform: listing.platform,
-          category_id: syncState.category,
-          characteristics: syncState.characteristics,
-          part_number_key: syncState.part_number_key,
-        }),
-      });
-      if (!res.ok) {
+    const payloadProducts = candidates.flatMap(({ listing, currentSyncState }) => {
+      const sku = skuByProductId.get(listing.productId);
+      if (!sku) {
         this.logger.warn(
-          { listingId: listing.id, status: res.status },
-          'prelist validated: webhook responded non-OK',
+          { listingId: listing.id, productId: listing.productId },
+          'prelist validated: product not found, excluding from webhook batch',
         );
-      } else {
-        this.logger.log({ listingId: listing.id, sku }, 'prelist validated: webhook notified');
+        return [];
       }
-    } catch (err) {
-      this.logger.warn(
-        { listingId: listing.id, err: errMsg(err) },
-        'prelist validated: webhook call failed',
-      );
-    }
+      return [
+        {
+          sku,
+          platform: listing.platform,
+          category_id: currentSyncState.category,
+          characteristics: currentSyncState.characteristics,
+        },
+      ];
+    });
+    if (payloadProducts.length === 0) return;
+
+    await this.queue.enqueue<PrelistValidatedWebhookJob>(PRELIST_VALIDATED_WEBHOOK_JOB, {
+      url,
+      products: payloadProducts,
+    });
+    this.logger.log({ count: payloadProducts.length }, 'prelist validated: webhook batch queued');
+  }
+
+  /** Job handler pentru PRELIST_VALIDATED_WEBHOOK_JOB — aruncă la eșec ca pg-boss să reîncerce. */
+  private async sendPrelistWebhook(data: PrelistValidatedWebhookJob): Promise<void> {
+    const res = await fetch(data.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: data.products }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    this.logger.log({ count: data.products.length }, 'prelist validated: webhook notified');
   }
 
   /** true dacă o corecție a mai fost încercată recent — sărim peste re-corecție, dar tot re-verificăm statusul. */

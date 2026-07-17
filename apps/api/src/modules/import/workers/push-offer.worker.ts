@@ -16,6 +16,7 @@ import { LoadedPluginsRegistry } from '../../plugins/loader/loaded-plugins.regis
 import { PluginRegistryService } from '../../plugins/registry/plugin-registry.service.js';
 import { ProductsService } from '../../products/products.service.js';
 import { StockCodeService } from '../../products/stock-code.service.js';
+import { WorkspaceService } from '../../workspace/workspace.service.js';
 import { temuComplianceConfigSchema, type TemuComplianceConfig } from '../dto/push-import.dto.js';
 import {
   EMAG_ASSOCIATE_JOB,
@@ -61,6 +62,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     private readonly listings: ListingsService,
     private readonly stockCodes: StockCodeService,
     private readonly requestLog: PluginRequestLogService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -131,10 +133,12 @@ export class PushOfferWorker implements OnApplicationBootstrap {
       'push-offer worker: dispatching to marketplace branch',
     );
 
+    const { vatPayer } = await this.workspace.get();
+
     if (plugin.packageName === EMAG_PACKAGE) {
-      await this.pushEmag(loaded.instance, job.pluginId, job.marketplace, contexts);
+      await this.pushEmag(loaded.instance, job.pluginId, job.marketplace, contexts, vatPayer);
     } else if (plugin.packageName === TRENDYOL_PACKAGE) {
-      await this.pushTrendyol(loaded.instance, job.marketplace, contexts);
+      await this.pushTrendyol(loaded.instance, job.marketplace, contexts, vatPayer);
     } else if (plugin.packageName === TEMU_PACKAGE) {
       // Default-uri compliance account-wide din config-ul plugin-ului (override-ite per produs).
       const parsedCompliance = temuComplianceConfigSchema.safeParse(plugin.config.temuCompliance);
@@ -142,6 +146,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
         loaded.instance,
         contexts,
         parsedCompliance.success ? parsedCompliance.data : undefined,
+        vatPayer,
       );
     } else {
       this.logger.warn(
@@ -157,6 +162,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     pluginId: string,
     marketplace: string,
     contexts: OfferContext[],
+    vatPayer: boolean,
   ): Promise<void> {
     const groups = chunk(contexts, EMAG_BATCH);
 
@@ -172,6 +178,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
             stockCode: c.stockCode,
             // marketplace-ul job-ului e sursa sigură a platformei (= listing.platform).
             platform: marketplace,
+            vatPayer,
           }),
         );
         this.logger.log(
@@ -220,7 +227,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
       } else {
         const err: unknown =
           result?.status === 'rejected' ? (result.reason as unknown) : new Error('unknown');
-        await this.handleEmagPushError(instance, marketplace, group, err);
+        await this.handleEmagPushError(instance, marketplace, group, err, vatPayer);
       }
     }
   }
@@ -239,6 +246,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     marketplace: string,
     group: OfferContext[],
     err: unknown,
+    vatPayer: boolean,
     isRetry = false,
   ): Promise<void> {
     const messages = extractEmagMessages(err);
@@ -248,7 +256,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
       (marketplace === 'emag-hu' || marketplace === 'emag-bg') &&
       hasCharacteristicError(messages)
     ) {
-      await this.retryWithRoContent(instance, marketplace, group);
+      await this.retryWithRoContent(instance, marketplace, group, vatPayer);
       return;
     }
 
@@ -344,6 +352,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     instance: Plugin,
     marketplace: string,
     contexts: OfferContext[],
+    vatPayer: boolean,
   ): Promise<void> {
     const storeFrontCode = trendyolStorefrontFor(marketplace);
     const groups = chunk(contexts, TRENDYOL_BATCH);
@@ -371,7 +380,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
         }
         if (valid.length === 0) return;
 
-        const items = valid.map((c) => this.buildTrendyolItem(c));
+        const items = valid.map((c) => this.buildTrendyolItem(c, vatPayer));
         try {
           const res = (await invokeAction(instance, 'createProduct', {
             items,
@@ -392,8 +401,13 @@ export class PushOfferWorker implements OnApplicationBootstrap {
   }
 
   /** Construiește item-ul Trendyol, reaplicând override-urile „Universal” persistate. */
-  private buildTrendyolItem(c: OfferContext): Record<string, unknown> {
-    const ctx = { product: c.product, syncState: c.listing.syncState, stockCode: c.stockCode };
+  private buildTrendyolItem(c: OfferContext, vatPayer: boolean): Record<string, unknown> {
+    const ctx = {
+      product: c.product,
+      syncState: c.listing.syncState,
+      stockCode: c.stockCode,
+      vatPayer,
+    };
     const ids = c.listing.syncState.universal_attr_ids;
     return Array.isArray(ids) && ids.length > 0
       ? toTrendyolItemWithUniversalAttrs(ctx, ids)
@@ -420,7 +434,8 @@ export class PushOfferWorker implements OnApplicationBootstrap {
   private async pushTemu(
     instance: Plugin,
     contexts: OfferContext[],
-    temuCompliance?: TemuComplianceConfig,
+    temuCompliance: TemuComplianceConfig | undefined,
+    vatPayer: boolean,
   ): Promise<void> {
     // Bounded concurrency: at most TEMU_CONCURRENCY requests in-flight at once.
     // The 15/s sliding-window limiter inside TemuClient.call() is the real throttle;
@@ -435,6 +450,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
         product: ctx.product,
         syncState: ctx.listing.syncState,
         stockCode: ctx.stockCode,
+        vatPayer,
         ...(temuCompliance ? { temuCompliance } : {}),
       };
       let goodsId: number;
@@ -584,6 +600,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     instance: Plugin,
     marketplace: string,
     group: OfferContext[],
+    vatPayer: boolean,
   ): Promise<void> {
     const roListings = new Map<string, schema.Listing>();
     for (const c of group) {
@@ -638,6 +655,7 @@ export class PushOfferWorker implements OnApplicationBootstrap {
         stockCode: ctx.stockCode,
         platform: marketplace,
         sourceLanguage: 'ro_RO',
+        vatPayer,
       }),
     );
 

@@ -20,6 +20,7 @@ import {
 import { createProductSchema } from '../products/dto/create-product.dto.js';
 import { ProductsService } from '../products/products.service.js';
 import { StockCodeService } from '../products/stock-code.service.js';
+import { WorkspaceService } from '../workspace/workspace.service.js';
 
 import {
   ACTIVATE_OFFERS_JOB,
@@ -119,6 +120,7 @@ export class PushImportService {
     private readonly queue: JobQueueService,
     private readonly currency: CurrencyService,
     private readonly stockCodes: StockCodeService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -436,6 +438,7 @@ export class PushImportService {
     // Contor local pentru produse noi: peekNext() se apelează o singură dată (lazy),
     // apoi incrementăm per produs — simulează exact alocarea secvențială din push live.
     let nextCode: number | null = null;
+    const { vatPayer } = await this.workspace.get();
 
     for (const product of input.products) {
       const existing = await this.products.findBySku(product.sku);
@@ -450,7 +453,7 @@ export class PushImportService {
       const previewProduct = this.buildPreviewProduct(product, stockCode);
       const marketplaces: MarketplacePayloadPreview[] = [];
       for (const offer of product.offers) {
-        marketplaces.push(await this.previewOffer(product, previewProduct, offer));
+        marketplaces.push(await this.previewOffer(product, previewProduct, offer, vatPayer));
       }
       products.push({ sku: product.sku, marketplaces });
     }
@@ -461,6 +464,7 @@ export class PushImportService {
     product: PushProductInput,
     previewProduct: schema.Product,
     offer: PushOfferInput,
+    vatPayer: boolean,
   ): Promise<MarketplacePayloadPreview> {
     const info = getMarketplace(offer.marketplace);
     if (!info) {
@@ -484,6 +488,7 @@ export class PushImportService {
       syncState,
       stockCode: previewProduct.stockCode ?? PREVIEW_STOCK_CODE,
       platform: offer.marketplace,
+      vatPayer,
     };
     const base = {
       marketplace: offer.marketplace,

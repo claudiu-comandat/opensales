@@ -13,8 +13,9 @@ import {
 import { LoadedPluginsRegistry } from '../../plugins/loader/loaded-plugins.registry.js';
 import { PluginRegistryService } from '../../plugins/registry/plugin-registry.service.js';
 import { ProductsService } from '../../products/products.service.js';
+import { WorkspaceService } from '../../workspace/workspace.service.js';
 import { UPDATE_PRICE_JOB, type UpdatePriceJob } from '../push-jobs.js';
-import { emagVatIdForRate } from '../push-offer.mapper.js';
+import { effectiveVatRate, emagVatIdForRate } from '../push-offer.mapper.js';
 import { TrendyolInventorySyncService } from '../trendyol-inventory-sync.service.js';
 
 function majorFromMinor(minor: string | number | bigint): number {
@@ -42,6 +43,7 @@ export class PriceUpdateWorker implements OnApplicationBootstrap {
     private readonly products: ProductsService,
     private readonly listings: ListingsService,
     private readonly trendyolSync: TrendyolInventorySyncService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -94,7 +96,8 @@ export class PriceUpdateWorker implements OnApplicationBootstrap {
       this.logger.warn({ listingId: listing.id }, 'skip eMAG price — missing offer id');
       return;
     }
-    const vatId = emagVatIdForRate(listing.platform, product.vatRate);
+    const { vatPayer } = await this.workspace.get();
+    const vatId = emagVatIdForRate(listing.platform, effectiveVatRate({ product, vatPayer }));
     await invokeAction(instance, 'updatePrice', {
       offerId,
       salePrice: sale,

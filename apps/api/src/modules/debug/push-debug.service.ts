@@ -22,6 +22,7 @@ import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 import { ProductsService } from '../products/products.service.js';
 import { StockCodeService } from '../products/stock-code.service.js';
+import { WorkspaceService } from '../workspace/workspace.service.js';
 
 export type PushFamily = 'emag' | 'trendyol' | 'temu' | 'unknown';
 
@@ -119,6 +120,7 @@ export class PushDebugService {
     private readonly products: ProductsService,
     private readonly listings: ListingsService,
     private readonly stockCodes: StockCodeService,
+    private readonly workspace: WorkspaceService,
     private readonly logger: Logger,
   ) {}
 
@@ -213,6 +215,7 @@ export class PushDebugService {
 
     const product = await this.products.get(listing.productId);
     const stockCode = await this.stockCodes.ensureForProduct(product.id);
+    const { vatPayer } = await this.workspace.get();
     steps.push({
       step: 'resolve product + stockCode',
       ok: true,
@@ -225,6 +228,7 @@ export class PushDebugService {
         syncState: listing.syncState,
         stockCode,
         platform: listing.platform,
+        vatPayer,
       });
       trace.payloadSent = payload;
       steps.push({ step: 'build eMAG payload', ok: true, detail: `id=${String(payload.id)}` });
@@ -266,7 +270,7 @@ export class PushDebugService {
     }
 
     // family === 'trendyol'
-    const item = toTrendyolItem({ product, syncState: listing.syncState, stockCode });
+    const item = toTrendyolItem({ product, syncState: listing.syncState, stockCode, vatPayer });
     trace.payloadSent = item;
     const storeFrontCode = trendyolStorefrontFor(listing.platform);
     steps.push({

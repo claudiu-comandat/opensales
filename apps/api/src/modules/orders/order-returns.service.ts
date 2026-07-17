@@ -407,7 +407,15 @@ export class OrderReturnsService {
     }
   }
 
-  private async computeRemainingItems(orderId: string): Promise<FgoReturnLineItem[]> {
+  /**
+   * `items` = produsele reale rămase (VOUCHER/TRANSPORT excluse). `transport` = linia de
+   * transport a comenzii (dacă există), separată pentru ca apelantul să decidă: o reemite
+   * DOAR când mai rămân produse reale (retur parțial — clientul tot a primit coletul), nu și
+   * pe returul care completează comanda (transportul rămâne stornat definitiv, o singură dată).
+   */
+  private async computeRemainingItems(
+    orderId: string,
+  ): Promise<{ items: FgoReturnLineItem[]; transport: FgoReturnLineItem | null }> {
     const items = await this.db
       .select()
       .from(schema.orderItems)
@@ -432,11 +440,22 @@ export class OrderReturnsService {
       );
     }
 
-    // Linia sintetică VOUCHER/TRANSPORT rămâne exclusă din reemitere — discountul real e deja
-    // alocat per produs (voucherAmountMinor, populat la import din eMAG product_voucher_split /
-    // Trendyol lineSellerDiscount+lineTyDiscount) și scăzut mai jos din prețul liniei păstrate.
-    // Transportul nu are alocare per-produs la nicio piață — rămâne exclus (decizie separată).
-    return items
+    const transportRow = items.find((it) => it.sku === 'TRANSPORT' && it.quantity > 0);
+    const transport: FgoReturnLineItem | null = transportRow
+      ? {
+          sku: transportRow.sku,
+          name: transportRow.name,
+          quantity: transportRow.quantity,
+          unitPriceAmountMinor: transportRow.unitPriceAmountMinor,
+          unitPriceCurrency: transportRow.unitPriceCurrency,
+          attributes: transportRow.attributes,
+        }
+      : null;
+
+    // Linia sintetică VOUCHER rămâne exclusă din reemitere — discountul real e deja alocat per
+    // produs (voucherAmountMinor, populat la import din eMAG product_voucher_split / Trendyol
+    // lineSellerDiscount+lineTyDiscount) și scăzut mai jos din prețul liniei păstrate.
+    const realItems = items
       .filter((it) => !SYNTHETIC_SKUS.has(it.sku))
       .map((it) => {
         // Discount per unitate (total liniei / cantitatea originală) — aplicat produselor
@@ -455,6 +474,8 @@ export class OrderReturnsService {
         };
       })
       .filter((it) => it.quantity > 0);
+
+    return { items: realItems, transport };
   }
 
   private async runFgoInvoicing(
@@ -482,7 +503,7 @@ export class OrderReturnsService {
       .set({ invoiceStorno })
       .where(eq(schema.orderReturns.id, orderReturn.id));
 
-    const remaining = await this.computeRemainingItems(orderId);
+    const { items: remaining, transport } = await this.computeRemainingItems(orderId);
 
     // Retur total (nimic rămas de facturat) → comanda trece în "returned". Nu blocăm restul
     // procesării dacă tranziția nu e validă din starea curentă (ex. deja returned/cancelled).
@@ -497,11 +518,16 @@ export class OrderReturnsService {
       }
     }
 
+    // Transportul se reemite DOAR cât mai rămân produse reale (clientul tot a primit coletul) —
+    // pe returul care completează comanda (remaining gol) rămâne exclus, deci stornat definitiv,
+    // o singură dată (storno-ul de mai sus anulează oricum ultima factură care îl conținea).
+    const reissueItems = remaining.length > 0 && transport ? [...remaining, transport] : remaining;
+
     let invoiceReissue: schema.OrderInvoice | null = null;
     if (remaining.length > 0 || options.feeAmountMinor) {
       const reissueRes = (await invokeAction(fgoPlugin.instance, 'emitReturnInvoice', {
         orderId,
-        items: remaining,
+        items: reissueItems,
         ...(options.feeAmountMinor !== undefined ? { feeAmountMinor: options.feeAmountMinor } : {}),
         ...(options.feeCurrency ? { feeCurrency: options.feeCurrency } : {}),
       })) as { series: string; number: string; issuedAt: string };

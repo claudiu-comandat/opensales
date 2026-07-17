@@ -232,6 +232,13 @@
       "when": 1782700000000,
       "tag": "0031_workspace_vat_payer",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782800000000,
+      "tag": "0032_order_items_voucher_amount",
+      "breakpoints": true
     }
   ]
 }

@@ -68,6 +68,8 @@ export interface EmagOrderRaw {
     quantity: number;
     sale_price: number | string;
     status?: number;
+    /** Discount/voucher alocat acestei linii de produs (doc § 5.1.1) — `value` vine negativ. */
+    product_voucher_split?: { value?: number | string }[];
     /** Offer SKU (e.g. "B0CT4GKBQ5"). Primary lookup key. */
     part_number?: string;
     part_number_key?: string;
@@ -471,6 +473,12 @@ export function mapEmagOrderToDb(
     // may be 0 for fully-returned items.
     const initialQty = p.initial_qty ?? 0;
     const displayQty = initialQty > 0 ? initialQty : p.quantity;
+    // Discount alocat direct acestei linii (product_voucher_split) — total pentru
+    // displayQty unități, folosit la reemiterea facturii pe retur parțial.
+    const voucherTotal = (p.product_voucher_split ?? []).reduce(
+      (sum, v) => sum + Math.abs(safeFloat(v.value)),
+      0,
+    );
     items.push({
       id: uuidv7(),
       orderId: newOrder.id,
@@ -480,6 +488,7 @@ export function mapEmagOrderToDb(
       quantity: displayQty,
       unitPriceAmountMinor: toMinor(unitPrice),
       unitPriceCurrency: currency,
+      voucherAmountMinor: voucherTotal > 0 ? toMinor(voucherTotal) : null,
     });
     // For returned units, add a separate storno line with negative quantity so
     // the order detail shows both what was ordered and what was returned.

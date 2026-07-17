@@ -257,6 +257,9 @@ export function mapTrendyolPackageToDb(
         // amount / lineGrossAmount = prețul brut per unitate (înainte de discount)
         const unitPriceAmountMinor = toMinor(asNumber(line.amount ?? line.lineGrossAmount));
         const productId = resolved?.productId ?? null;
+        // Discount alocat direct acestei linii (seller + Trendyol) — total pentru
+        // `quantity` unități, folosit la reemiterea facturii pe retur parțial.
+        const lineDiscount = asNumber(line.lineSellerDiscount) + asNumber(line.lineTyDiscount);
         return {
           id: uuidv7(),
           orderId: newOrder.id,
@@ -266,6 +269,7 @@ export function mapTrendyolPackageToDb(
           quantity,
           unitPriceAmountMinor,
           unitPriceCurrency: totalCurrency,
+          voucherAmountMinor: lineDiscount > 0 ? toMinor(lineDiscount) : null,
         };
       })
     : [];

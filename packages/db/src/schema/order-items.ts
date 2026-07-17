@@ -28,6 +28,9 @@ export const orderItems = pgTable(
     quantity: integer('quantity').notNull(),
     unitPriceAmountMinor: bigint('unit_price_amount_minor', { mode: 'bigint' }).notNull(),
     unitPriceCurrency: char('unit_price_currency', { length: 3 }).notNull(),
+    /** Discount/voucher total pentru cantitatea originală a liniei (eMAG product_voucher_split,
+     * Trendyol lineSellerDiscount+lineTyDiscount) — null dacă linia n-a avut discount alocat. */
+    voucherAmountMinor: bigint('voucher_amount_minor', { mode: 'bigint' }),
     totalAmountMinor: bigint('total_amount_minor', { mode: 'bigint' })
       .notNull()
       .generatedAlwaysAs(sql`quantity * unit_price_amount_minor`),

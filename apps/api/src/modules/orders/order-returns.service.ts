@@ -432,18 +432,28 @@ export class OrderReturnsService {
       );
     }
 
-    // ponytail: liniile sintetice (voucher/transport) sunt excluse din reemitere. Proporționarea
-    // discountului/transportului pe returul parțial e o decizie de business — de adăugat dacă e cerut.
+    // Linia sintetică VOUCHER/TRANSPORT rămâne exclusă din reemitere — discountul real e deja
+    // alocat per produs (voucherAmountMinor, populat la import din eMAG product_voucher_split /
+    // Trendyol lineSellerDiscount+lineTyDiscount) și scăzut mai jos din prețul liniei păstrate.
+    // Transportul nu are alocare per-produs la nicio piață — rămâne exclus (decizie separată).
     return items
       .filter((it) => !SYNTHETIC_SKUS.has(it.sku))
-      .map((it) => ({
-        sku: it.sku,
-        name: it.name,
-        quantity: it.quantity - (returnedByItem.get(it.id) ?? 0),
-        unitPriceAmountMinor: it.unitPriceAmountMinor,
-        unitPriceCurrency: it.unitPriceCurrency,
-        attributes: it.attributes,
-      }))
+      .map((it) => {
+        // Discount per unitate (total liniei / cantitatea originală) — aplicat produselor
+        // PĂSTRATE, ca factura reemisă să reflecte discountul propriu, nu prețul brut.
+        const voucherPerUnitMinor =
+          it.voucherAmountMinor !== null && it.quantity > 0
+            ? BigInt(Math.round(Number(it.voucherAmountMinor) / it.quantity))
+            : 0n;
+        return {
+          sku: it.sku,
+          name: it.name,
+          quantity: it.quantity - (returnedByItem.get(it.id) ?? 0),
+          unitPriceAmountMinor: it.unitPriceAmountMinor - voucherPerUnitMinor,
+          unitPriceCurrency: it.unitPriceCurrency,
+          attributes: it.attributes,
+        };
+      })
       .filter((it) => it.quantity > 0);
   }
 

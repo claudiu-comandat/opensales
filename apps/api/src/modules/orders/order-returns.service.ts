@@ -9,6 +9,9 @@ import { DomainError } from '../../errors/domain.error.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 
+import { OrdersService } from './orders.service.js';
+import { canTransition } from './status-state-machine.js';
+
 const FGO_PACKAGE = '@opensales-plugin/fgo';
 
 /**
@@ -78,6 +81,7 @@ export class OrderReturnsService {
     @Inject(DB_TOKEN) private readonly db: Database,
     private readonly loaded: LoadedPluginsRegistry,
     private readonly registry: PluginRegistryService,
+    private readonly orders: OrdersService,
     private readonly logger: Logger,
   ) {}
 
@@ -469,6 +473,20 @@ export class OrderReturnsService {
       .where(eq(schema.orderReturns.id, orderReturn.id));
 
     const remaining = await this.computeRemainingItems(orderId);
+
+    // Retur total (nimic rămas de facturat) → comanda trece în "returned". Nu blocăm restul
+    // procesării dacă tranziția nu e validă din starea curentă (ex. deja returned/cancelled).
+    if (remaining.length === 0) {
+      const [order] = await this.db
+        .select({ status: schema.orders.status })
+        .from(schema.orders)
+        .where(eq(schema.orders.id, orderId))
+        .limit(1);
+      if (order && canTransition(order.status, 'returned')) {
+        await this.orders.updateStatus(orderId, 'returned');
+      }
+    }
+
     let invoiceReissue: schema.OrderInvoice | null = null;
     if (remaining.length > 0 || options.feeAmountMinor) {
       const reissueRes = (await invokeAction(fgoPlugin.instance, 'emitReturnInvoice', {

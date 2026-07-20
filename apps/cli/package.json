@@ -25,6 +25,6 @@
   },
   "devDependencies": {
     "@types/tar": "^7.0.87",
-    "tsx": "^4.19.1"
+    "tsx": "^4.23.1"
   }
 }

@@ -18,6 +18,9 @@ export interface OrderItemResponse {
   total: { amountMinor: string; currency: string };
   attributes: Record<string, unknown>;
   substitution: OrderItemSubstitution | null;
+  /** Discount/voucher alocat direct acestei linii (eMAG product_voucher_split,
+   * Trendyol lineSellerDiscount+lineTyDiscount). Null dacă linia n-a avut discount alocat. */
+  voucher: { amountMinor: string; currency: string } | null;
 }
 
 /**
@@ -227,6 +230,10 @@ export function toItemResponse(
             originalProductId: i.originalProductId ?? null,
             substitutedAt: i.substitutedAt.toISOString(),
           }
+        : null,
+    voucher:
+      i.voucherAmountMinor !== null
+        ? { amountMinor: i.voucherAmountMinor.toString(), currency: i.unitPriceCurrency }
         : null,
   };
 }

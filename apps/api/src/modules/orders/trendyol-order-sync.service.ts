@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { type Database, DB_TOKEN, schema } from '@opensales/db';
 import { invokeAction, type Plugin } from '@opensales/plugin-sdk';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { Logger } from 'nestjs-pino';
 
 import { JobQueueService } from '../../jobs/job-queue.service.js';
@@ -9,6 +9,7 @@ import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 import { StockService } from '../stock/stock.service.js';
 
+import { preserveSubstitutions } from './emag-order-sync.mapper.js';
 import {
   collectLineCandidates,
   mapTrendyolPackageToDb,
@@ -371,8 +372,28 @@ export class TrendyolOrderSyncService implements OnApplicationBootstrap {
         .where(eq(schema.orders.id, orderId));
 
       if (items.length > 0) {
+        // Substituțiile manuale (vezi OrdersService.substituteItem) trăiesc doar
+        // în order_items — trebuie reaplicate peste payload-ul Trendyol, altfel
+        // delete+insert de mai jos le suprascrie silențios la fiecare re-sync.
+        const existingSubstituted = await tx
+          .select({
+            productId: schema.orderItems.productId,
+            sku: schema.orderItems.sku,
+            name: schema.orderItems.name,
+            originalSku: schema.orderItems.originalSku,
+            originalName: schema.orderItems.originalName,
+            originalProductId: schema.orderItems.originalProductId,
+            substitutedAt: schema.orderItems.substitutedAt,
+            quantity: schema.orderItems.quantity,
+          })
+          .from(schema.orderItems)
+          .where(
+            and(eq(schema.orderItems.orderId, orderId), isNotNull(schema.orderItems.substitutedAt)),
+          );
+
+        const mergedItems = preserveSubstitutions(existingSubstituted, items);
         await tx.delete(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-        const updatedItems = items.map((item) => ({ ...item, orderId }));
+        const updatedItems = mergedItems.map((item) => ({ ...item, orderId }));
         await tx.insert(schema.orderItems).values(updatedItems);
       }
 

@@ -31,6 +31,7 @@ interface OrderItem {
     originalProductId: string | null;
     substitutedAt: string;
   } | null;
+  voucher: { amountMinor: string; currency: string } | null;
 }
 
 interface MoneyValue {
@@ -511,6 +512,11 @@ export default async function OrderDetailPage({
                       </td>
                       <td className="border-b border-ink-100 px-[14px] py-3 text-right align-middle font-mono tabular-nums text-[13px] font-medium text-ink-900">
                         {formatMoney(it.total)}
+                        {it.voucher && Number(it.voucher.amountMinor) > 0 ? (
+                          <div className="text-[11px] font-normal text-green-700">
+                            Voucher: -{formatMoney(it.voucher)}
+                          </div>
+                        ) : null}
                       </td>
                       {order.marketplace !== null ? (
                         <td className="border-b border-ink-100 px-[10px] py-3 align-middle">

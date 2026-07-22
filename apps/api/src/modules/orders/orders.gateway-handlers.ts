@@ -107,6 +107,7 @@ export class OrdersGatewayHandlers implements OnApplicationBootstrap {
             unitPriceCurrency: i.unitPriceCurrency,
             productId: i.productId ?? undefined,
             attributes: i.attributes,
+            voucherAmountMinor: i.voucherAmountMinor ?? undefined,
           };
         }),
       };

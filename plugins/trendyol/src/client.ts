@@ -213,7 +213,9 @@ export class TrendyolClient {
       return undefined as T;
     }
 
-    const data = (await response.json()) as T;
+    // Unele endpoint-uri (ex. items/unsupplied) răspund 200 cu body gol.
+    const text = await response.text();
+    const data = (text ? JSON.parse(text) : undefined) as T;
     this.trace({
       method,
       path,

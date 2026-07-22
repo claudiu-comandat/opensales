@@ -34,9 +34,15 @@ export interface ProductResponse {
   listings: ListingInfo[];
   createdAt: string;
   updatedAt: string;
+  /** Doar pe răspunsul de PATCH — câmpurile pe care sistemul le-a detectat ca schimbate. */
+  changedFields?: string[];
 }
 
-export function toResponse(p: schema.Product, listings: ListingInfo[] = []): ProductResponse {
+export function toResponse(
+  p: schema.Product,
+  listings: ListingInfo[] = [],
+  changedFields?: string[],
+): ProductResponse {
   return {
     id: p.id,
     sku: p.sku,
@@ -62,5 +68,6 @@ export function toResponse(p: schema.Product, listings: ListingInfo[] = []): Pro
     listings,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+    ...(changedFields !== undefined ? { changedFields } : {}),
   };
 }

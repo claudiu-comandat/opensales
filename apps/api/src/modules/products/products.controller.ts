@@ -106,7 +106,8 @@ export class ProductsController {
     @Param('id') id: string,
     @Body(zodPipe(updateProductSchema)) body: UpdateProductDto,
   ): Promise<ProductResponse> {
-    return toResponse(await this.service.update(id, body));
+    const { product, changedFields } = await this.service.update(id, body);
+    return toResponse(product, [], changedFields);
   }
 
   @Delete(':id')

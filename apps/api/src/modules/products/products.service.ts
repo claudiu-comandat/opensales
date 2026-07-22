@@ -587,7 +587,10 @@ export class ProductsService {
     return changedFields.some((k) => k !== 'stockQuantity' && !ProductsService.PRICE_FIELDS.has(k));
   }
 
-  async update(id: string, input: UpdateProductDto): Promise<schema.Product> {
+  async update(
+    id: string,
+    input: UpdateProductDto,
+  ): Promise<{ product: schema.Product; changedFields: string[] }> {
     const result = await this.applyUpdate(id, input);
     if (!result) throw DomainError.notFound(`Product not found: ${id}`);
     const { row, changedFields } = result;
@@ -607,7 +610,7 @@ export class ProductsService {
         items: [{ productId: row.id, changedFields }],
       });
     }
-    return row;
+    return { product: row, changedFields };
   }
 
   /**

@@ -160,8 +160,9 @@ describe.skipIf(!hasDb)('ProductsService', () => {
     const svc = makeService();
     const created = await svc.create(base);
     const updated = await svc.update(created.id, { name: 'Updated Name' });
-    expect(updated.name).toBe('Updated Name');
-    expect(updated.sku).toBe('SKU-SVC-001');
+    expect(updated.product.name).toBe('Updated Name');
+    expect(updated.product.sku).toBe('SKU-SVC-001');
+    expect(updated.changedFields).toEqual(['name']);
   });
 
   it('update throws 404 for unknown id', async () => {
@@ -174,7 +175,7 @@ describe.skipIf(!hasDb)('ProductsService', () => {
     const created = await svc.create(base);
     enqueueMock.mockClear();
     const updated = await svc.update(created.id, { sku: 'SKU-RENAMED' });
-    expect(updated.sku).toBe('SKU-RENAMED');
+    expect(updated.product.sku).toBe('SKU-RENAMED');
     expect(enqueueMock).toHaveBeenCalledWith('plugin.update_product_content', {
       items: [{ productId: created.id, changedFields: ['sku'] }],
     });
@@ -406,7 +407,7 @@ describe.skipIf(!hasDb)('ProductsService', () => {
 
     const updated = await svc.update(p.id, { ...base, priceAmountMinor: 30000n, name: 'New Name' });
 
-    expect(updated.priceAmountMinor).toBe(30000n);
+    expect(updated.product.priceAmountMinor).toBe(30000n);
     expect(warnMock).toHaveBeenCalledWith(
       expect.objectContaining({ listingId: listing.id }),
       expect.stringContaining('push de preț eșuat'),

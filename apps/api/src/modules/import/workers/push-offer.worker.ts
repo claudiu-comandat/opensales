@@ -25,6 +25,7 @@ import {
   type PushOffersJob,
 } from '../push-jobs.js';
 import {
+  emagPayloadIssues,
   toEmagMeasurementsPayload,
   toEmagOfferPayload,
   toTemuCompliancePayload,
@@ -164,7 +165,29 @@ export class PushOfferWorker implements OnApplicationBootstrap {
     contexts: OfferContext[],
     vatPayer: boolean,
   ): Promise<void> {
-    const groups = chunk(contexts, EMAG_BATCH);
+    // Pre-validăm fiecare ofertă — la fel ca la Trendyol mai jos (trendyolPayloadIssues).
+    // Fără asta, un câmp lipsă (ex. category_id nesetat pe acest listing) ajunge NaN în
+    // payload → JSON.stringify îl serializează ca `null` → eMAG tratează update-ul ca
+    // încercare de creare produs nou și respinge cu duplicate part_number (eroare 29034),
+    // în loc de update-ul de conținut/stoc intenționat.
+    const valid: OfferContext[] = [];
+    for (const c of contexts) {
+      const { missingRequired } = emagPayloadIssues({
+        product: c.product,
+        syncState: c.listing.syncState,
+        stockCode: c.stockCode,
+        platform: marketplace,
+        vatPayer,
+      });
+      if (missingRequired.length > 0) {
+        await this.markError(c.listing, new Error(`Câmpuri lipsă: ${missingRequired.join(', ')}`));
+      } else {
+        valid.push(c);
+      }
+    }
+    if (valid.length === 0) return;
+
+    const groups = chunk(valid, EMAG_BATCH);
 
     // Launch all chunk requests concurrently — the in-plugin rate limiter
     // (acquireSaveOfferSlot, 150/min shared) caps the actual launch rate.

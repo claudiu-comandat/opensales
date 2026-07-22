@@ -96,6 +96,8 @@ export const UpdatePackageStatusInputSchema = z.object({
       }),
     )
     .optional(),
+  /** Storefront opțional pentru rutare multi-țară (extras de adaptRoutableAction). */
+  storeFrontCode: storeFrontCodeSchema.optional(),
 });
 
 export type UpdatePackageStatusInput = z.infer<typeof UpdatePackageStatusInputSchema>;
@@ -111,6 +113,8 @@ export const UpdateTrackingNumberInputSchema = z.object({
   cargoTrackingNumber: z.string().min(1),
   /** Cargo provider code (courier identifier) */
   cargoProviderCode: z.string().min(1),
+  /** Storefront opțional pentru rutare multi-țară (extras de adaptRoutableAction). */
+  storeFrontCode: storeFrontCodeSchema.optional(),
 });
 
 export type UpdateTrackingNumberInput = z.infer<typeof UpdateTrackingNumberInputSchema>;
@@ -129,6 +133,8 @@ export const CancelPackageInputSchema = z.object({
       quantity: z.number().int().min(1),
     }),
   ),
+  /** Storefront opțional pentru rutare multi-țară (extras de adaptRoutableAction). */
+  storeFrontCode: storeFrontCodeSchema.optional(),
 });
 
 export type CancelPackageInput = z.infer<typeof CancelPackageInputSchema>;
@@ -141,6 +147,8 @@ export type CancelPackageOutput = z.infer<typeof CancelPackageOutputSchema>;
 export const GetAwbLabelInputSchema = z.object({
   /** Numărul de tracking al coletului (cargo tracking number / barcode AWB). */
   cargoTrackingNumber: z.string().min(1),
+  /** Storefront opțional pentru rutare multi-țară (extras de adaptRoutableAction). */
+  storeFrontCode: storeFrontCodeSchema.optional(),
 });
 
 export type GetAwbLabelInput = z.infer<typeof GetAwbLabelInputSchema>;
@@ -159,6 +167,8 @@ export type GetAwbLabelOutput = z.infer<typeof GetAwbLabelOutputSchema>;
 export const SendInvoiceLinkInputSchema = z.object({
   invoiceLink: z.string().min(1),
   shipmentPackageId: z.number().int().positive(),
+  /** Storefront opțional pentru rutare multi-țară (extras de adaptRoutableAction). */
+  storeFrontCode: storeFrontCodeSchema.optional(),
 });
 
 export type SendInvoiceLinkInput = z.infer<typeof SendInvoiceLinkInputSchema>;

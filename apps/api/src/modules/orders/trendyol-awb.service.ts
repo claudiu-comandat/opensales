@@ -3,6 +3,7 @@ import { type Database, DB_TOKEN, schema } from '@opensales/db';
 import { invokeAction } from '@opensales/plugin-sdk';
 import { eq } from 'drizzle-orm';
 
+import { trendyolStorefrontFor } from '../marketplaces/marketplace-catalog.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 
 export interface AwbLabelResult {
@@ -45,6 +46,7 @@ export class TrendyolAwbService {
 
     const result = (await invokeAction(loadedPlugin.instance, 'getAwbLabel', {
       cargoTrackingNumber,
+      storeFrontCode: order.marketplace ? trendyolStorefrontFor(order.marketplace) : undefined,
     })) as { pdfBase64: string; contentType?: string };
 
     return {

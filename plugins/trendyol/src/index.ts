@@ -81,6 +81,11 @@ function getClient(): Promise<TrendyolClient> {
   return getClientFor();
 }
 
+/** order.marketplace e 'trendyol-<cod storefront>' (ex. 'trendyol-bg') — extrage codul. */
+function storefrontFromMarketplace(marketplace: string): TrendyolStoreFrontCode {
+  return marketplace.slice('trendyol-'.length).toUpperCase() as TrendyolStoreFrontCode;
+}
+
 interface TrendyolActionDef {
   input: z.ZodType<unknown>;
   output: z.ZodType<unknown>;
@@ -133,11 +138,15 @@ const allActions: ActionHandlerMap = {
   // ── Orders ────────────────────────────────────────────────────────────────────
   getOrders: adaptRoutableAction(orderActions.getOrders),
   getOrdersStream: adaptRoutableAction(orderActions.getOrdersStream),
-  updatePackageStatus: adaptAction(orderActions.updatePackageStatus),
-  updateTrackingNumber: adaptAction(orderActions.updateTrackingNumber),
-  cancelPackage: adaptAction(orderActions.cancelPackage),
-  getAwbLabel: adaptAction(orderActions.getAwbLabel),
-  sendInvoiceLink: adaptAction(orderActions.sendInvoiceLink),
+  // Toate operează pe un shipment package care aparține unui storefront anume —
+  // rutează pe input.storeFrontCode, altfel headerul trimis (implicit RO) nu se
+  // potrivește cu storefront-ul real al pachetului și Trendyol respinge cu 400
+  // "shipment.package.supplier.storefront.not.matched".
+  updatePackageStatus: adaptRoutableAction(orderActions.updatePackageStatus),
+  updateTrackingNumber: adaptRoutableAction(orderActions.updateTrackingNumber),
+  cancelPackage: adaptRoutableAction(orderActions.cancelPackage),
+  getAwbLabel: adaptRoutableAction(orderActions.getAwbLabel),
+  sendInvoiceLink: adaptRoutableAction(orderActions.sendInvoiceLink),
 
   // ── Claims (retururi) ────────────────────────────────────────────────────────
   getClaims: adaptRoutableAction(claimActions.getClaims),
@@ -186,7 +195,9 @@ const plugin: Plugin = definePlugin({
           return;
         }
 
-        const client = await getClient();
+        // Rutează pe storefront-ul comenzii, nu pe default-ul RO, altfel Trendyol
+        // respinge cu 400 "storefront not matched" pentru comenzile din alte țări.
+        const client = await getClientFor(storefrontFromMarketplace(order.marketplace));
         try {
           await client.sendInvoiceLink(pdfUrl, shipmentPackageId);
           storedCtx.logger.info('Link factură trimis la Trendyol', { orderId, shipmentPackageId });
@@ -241,7 +252,7 @@ const plugin: Plugin = definePlugin({
           return;
         }
 
-        const client = await getClient();
+        const client = await getClientFor(storefrontFromMarketplace(order.marketplace));
         try {
           await client.sendInvoiceLink(pdfUrl, shipmentPackageId);
           storedCtx.logger.info('Link factură storno trimis la Trendyol', {

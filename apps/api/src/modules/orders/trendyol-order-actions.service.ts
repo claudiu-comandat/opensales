@@ -4,6 +4,7 @@ import { invokeAction } from '@opensales/plugin-sdk';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { Logger } from 'nestjs-pino';
 
+import { trendyolStorefrontFor } from '../marketplaces/marketplace-catalog.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 import { StockService } from '../stock/stock.service.js';
 
@@ -57,6 +58,10 @@ export class TrendyolOrderActionsService {
       packageId,
       reasonId,
       lines,
+      // Pachetul aparține storefront-ului comenzii — fără el, plugin-ul rutează
+      // implicit pe RO și Trendyol respinge cu 400 "storefront not matched"
+      // pentru comenzile din alte țări.
+      storeFrontCode: order.marketplace ? trendyolStorefrontFor(order.marketplace) : undefined,
     });
 
     // Comanda devine terminală → eliberează rezervarea de stoc dacă era activă.

@@ -13,6 +13,7 @@ import { EmagImportService } from '../import/emag-import.service.js';
 import { TemuImportService } from '../import/temu-import.service.js';
 import { TrendyolImportService } from '../import/trendyol-import.service.js';
 import { fetchInvoiceRef } from '../invoice/fgo-pdf-ref.js';
+import { trendyolStorefrontFor } from '../marketplaces/marketplace-catalog.js';
 import { LoadedPluginsRegistry } from '../plugins/loader/loaded-plugins.registry.js';
 import { PluginRegistryService } from '../plugins/registry/plugin-registry.service.js';
 
@@ -135,7 +136,9 @@ export class DebugService {
       .execute<{
         rows: string;
         total_bytes: string;
-      }>(sql`SELECT count(*)::text AS rows, pg_total_relation_size('plugin_request_log')::text AS total_bytes FROM plugin_request_log`)
+      }>(
+        sql`SELECT count(*)::text AS rows, pg_total_relation_size('plugin_request_log')::text AS total_bytes FROM plugin_request_log`,
+      )
       .catch(() => [] as { rows: string; total_bytes: string }[]);
     const logRow = logSize[0];
 
@@ -206,6 +209,7 @@ export class DebugService {
     const rows = await this.db
       .select({
         id: schema.orders.id,
+        marketplace: schema.orders.marketplace,
         invoice: schema.orders.invoice,
         rawPayload: schema.orders.rawPayload,
       })
@@ -235,6 +239,7 @@ export class DebugService {
         await invokeAction(plugin.instance, 'sendInvoiceLink', {
           invoiceLink: pdfUrl,
           shipmentPackageId,
+          storeFrontCode: row.marketplace ? trendyolStorefrontFor(row.marketplace) : undefined,
         });
         sent++;
       } catch (err) {

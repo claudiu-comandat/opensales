@@ -38,6 +38,10 @@ export const orderItemSchema = z
     quantity: z.number().int().min(1),
     unitPriceAmountMinor: amountSchema,
     unitPriceCurrency: z.string().length(3),
+    /** Discount/voucher alocat direct acestei linii (eMAG product_voucher_split,
+     * Trendyol lineSellerDiscount+lineTyDiscount) — reflectat ca reducere de preț
+     * per-produs pe factură, nu doar ca linie agregată de Voucher. */
+    voucherAmountMinor: amountSchema.nullable().optional(),
     attributes: z.record(z.unknown()).optional(),
   })
   .passthrough();
@@ -117,7 +121,34 @@ export function buildFgoEmitInput(
   const itemsForInvoice = isPickup
     ? order.items.filter((it) => it.sku !== 'TRANSPORT')
     : order.items;
-  const continut = itemsForInvoice.map((it) => buildLineItem(it, options));
+
+  // Discountul alocat direct pe fiecare linie de produs (item.voucherAmountMinor —
+  // eMAG product_voucher_split / Trendyol lineSellerDiscount+lineTyDiscount) e deja
+  // scăzut din PretUnitar în buildLineItem. Ca discountul să nu apară de două ori pe
+  // factură, "consumăm" aceeași sumă din liniile agregate de voucher deja existente
+  // (item cu sku=VOUCHER creat la sync, sau linia sintetică de mai jos) înainte să
+  // le adăugăm — le reducem, sau le omitem complet dacă discountul e deja acoperit
+  // integral per-produs.
+  let voucherOffsetMinor = itemsForInvoice.reduce((sum, it) => {
+    if (it.sku === 'VOUCHER') return sum;
+    const v = it.voucherAmountMinor;
+    return v !== null && v !== undefined && minorToMajor(v) > 0 ? sum + toBigIntMinor(v) : sum;
+  }, 0n);
+
+  const continut: FgoLineItem[] = [];
+  for (const it of itemsForInvoice) {
+    if (it.sku === 'VOUCHER' && voucherOffsetMinor > 0n) {
+      const grossMinor = absBigInt(toBigIntMinor(it.unitPriceAmountMinor));
+      const deduct = grossMinor < voucherOffsetMinor ? grossMinor : voucherOffsetMinor;
+      voucherOffsetMinor -= deduct;
+      const remainingMinor = grossMinor - deduct;
+      if (remainingMinor === 0n) continue; // acoperit integral de discountul per-produs
+      const sign = toBigIntMinor(it.unitPriceAmountMinor) < 0n ? -1n : 1n;
+      continut.push(buildLineItem({ ...it, unitPriceAmountMinor: sign * remainingMinor }, options));
+      continue;
+    }
+    continut.push(buildLineItem(it, options));
+  }
 
   // Skip synthetic transport line if an item with sku TRANSPORT already exists
   // (e.g. eMAG sends shipping as an order item AND sets shippingCostMinor).
@@ -141,22 +172,23 @@ export function buildFgoEmitInput(
   }
 
   // Adaugă linia sintetică de voucher doar dacă nu există deja iteme cu sku=VOUCHER
-  // (comenzile sincronizate din eMAG au voucherele stocate ca iteme distincte în DB).
+  // (comenzile sincronizate din eMAG au voucherele stocate ca iteme distincte în DB),
+  // și doar pentru partea încă neacoperită de discountul per-produs de mai sus.
   const hasVoucherItems = order.items.some((it) => it.sku === 'VOUCHER');
-  if (
-    !hasVoucherItems &&
-    order.vouchersMinor !== null &&
-    order.vouchersMinor !== undefined &&
-    minorToMajor(order.vouchersMinor) > 0
-  ) {
-    continut.push({
-      Denumire: 'Voucher',
-      NrProduse: -1,
-      UM: options.defaultUm ?? DEFAULT_UM,
-      CotaTVA: DEFAULT_VAT,
-      PretUnitar: minorToMajor(order.vouchersMinor),
-      CodArticol: 'VOUCHER',
-    });
+  if (!hasVoucherItems && order.vouchersMinor !== null && order.vouchersMinor !== undefined) {
+    const grossVoucherMinor = toBigIntMinor(order.vouchersMinor);
+    const netVoucherMinor =
+      grossVoucherMinor > voucherOffsetMinor ? grossVoucherMinor - voucherOffsetMinor : 0n;
+    if (netVoucherMinor > 0n && minorToMajor(netVoucherMinor) > 0) {
+      continut.push({
+        Denumire: 'Voucher',
+        NrProduse: -1,
+        UM: options.defaultUm ?? DEFAULT_UM,
+        CotaTVA: DEFAULT_VAT,
+        PretUnitar: minorToMajor(netVoucherMinor),
+        CodArticol: 'VOUCHER',
+      });
+    }
   }
 
   if (options.extraLine) {
@@ -229,7 +261,15 @@ function buildLineItem(
   const umRaw = attrs.um;
   const um = typeof umRaw === 'string' ? umRaw : (options.defaultUm ?? DEFAULT_UM);
 
-  const pretUnitar = minorToMajor(item.unitPriceAmountMinor);
+  // Discount alocat direct acestei linii (item.voucherAmountMinor) — scăzut din prețul
+  // unitar ca factura să reflecte reducerea per-produs, nu prețul brut. Rămâne 0 pentru
+  // reemiterea pe retur parțial, unde apelantul trimite deja unitPriceAmountMinor net
+  // și nu setează voucherAmountMinor pe itemii rămași (vezi order-returns.service.ts).
+  const voucherPerUnitMinor =
+    item.voucherAmountMinor !== null && item.voucherAmountMinor !== undefined && item.quantity > 0
+      ? BigInt(Math.round(Number(item.voucherAmountMinor) / item.quantity))
+      : 0n;
+  const pretUnitar = minorToMajor(toBigIntMinor(item.unitPriceAmountMinor) - voucherPerUnitMinor);
   // FGO nu acceptă PretUnitar negativ. Pentru linii de discount/voucher cu preț
   // negativ, FGO cere NrProduse negativ și PretUnitar pozitiv (Math.abs).
   const line: FgoLineItem = {
@@ -253,6 +293,17 @@ export function minorToMajor(value: bigint | number | string): number {
   if (typeof value === 'number') return value / 100;
   const n = Number(value);
   return Number.isFinite(n) ? n / 100 : 0;
+}
+
+/** Normalizează un amount_minor (bigint | number | string) la bigint, pentru aritmetică exactă. */
+function toBigIntMinor(value: bigint | number | string): bigint {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number') return BigInt(Math.round(value));
+  return BigInt(value);
+}
+
+function absBigInt(value: bigint): bigint {
+  return value < 0n ? -value : value;
 }
 
 /**
